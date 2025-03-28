@@ -1,5 +1,5 @@
 
-import { Wallet, WalletType, FilterOptions, DatabaseStats } from './types';
+import { Wallet, WalletType, FilterOptions, DatabaseStats, SearchPatternType } from './types';
 
 // Mock implementation of a high-performance database
 // In a real application, this would use IndexedDB, SQLite, or other storage solution
@@ -69,9 +69,55 @@ class WalletDatabase {
     
     if (options.pattern) {
       const pattern = options.pattern.toLowerCase();
-      results = results.filter(wallet => 
-        wallet.address.toLowerCase().includes(pattern)
-      );
+      
+      switch (options.patternType) {
+        case 'ANY':
+          results = results.filter(wallet => 
+            wallet.address.toLowerCase().includes(pattern)
+          );
+          break;
+        case 'END':
+          const endLength = options.patternLength || pattern.length;
+          results = results.filter(wallet => {
+            const address = wallet.address.toLowerCase();
+            return address.endsWith(pattern) || 
+                  (endLength > 0 && address.slice(-endLength) === pattern);
+          });
+          break;
+        case 'START':
+          const startLength = options.patternLength || pattern.length;
+          results = results.filter(wallet => {
+            const address = wallet.address.toLowerCase();
+            return address.startsWith(pattern) || 
+                  (startLength > 0 && address.slice(0, startLength) === pattern);
+          });
+          break;
+        case 'START_END':
+          results = results.filter(wallet => {
+            const address = wallet.address.toLowerCase();
+            const parts = pattern.split('+');
+            if (parts.length !== 2) return false;
+            
+            const [start, end] = parts;
+            return address.startsWith(start) && address.endsWith(end);
+          });
+          break;
+        case 'CUSTOM':
+          // For custom length pattern searches
+          const length = options.patternLength;
+          if (length > 0) {
+            results = results.filter(wallet => {
+              const address = wallet.address.toLowerCase();
+              // Search for pattern of exact length
+              return address.includes(pattern) && pattern.length === length;
+            });
+          } else {
+            results = results.filter(wallet => 
+              wallet.address.toLowerCase().includes(pattern)
+            );
+          }
+          break;
+      }
     }
     
     if (options.dateFrom) {

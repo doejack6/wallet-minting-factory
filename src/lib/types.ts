@@ -36,9 +36,13 @@ export interface DatabaseStats {
   erc20Count: number;
 }
 
+export type SearchPatternType = 'ANY' | 'END' | 'START' | 'START_END' | 'CUSTOM';
+
 export interface FilterOptions {
   type: WalletType | 'ALL';
   pattern: string;
+  patternType: SearchPatternType;
+  patternLength: number;
   dateFrom: Date | null;
   dateTo: Date | null;
   limit: number;

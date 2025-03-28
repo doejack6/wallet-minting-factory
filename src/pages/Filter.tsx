@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,17 +19,27 @@ import {
   TableHeader, 
   TableRow 
 } from '@/components/ui/table';
-import { Filter as FilterIcon, Copy, RefreshCw, Search, Calendar, Key } from 'lucide-react';
-import { FilterOptions, Wallet, WalletType } from '@/lib/types';
+import { Filter as FilterIcon, Copy, RefreshCw, Search, Key, Hash } from 'lucide-react';
+import { FilterOptions, Wallet, WalletType, SearchPatternType } from '@/lib/types';
 import { walletDB } from '@/lib/database';
 import { useToast } from '@/components/ui/use-toast';
 import { Link } from 'react-router-dom';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const Filter: React.FC = () => {
   const { toast } = useToast();
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({
     type: 'ALL',
     pattern: '',
+    patternType: 'ANY',
+    patternLength: 0,
     dateFrom: null,
     dateTo: null,
     limit: 100,
@@ -37,6 +48,7 @@ const Filter: React.FC = () => {
   const [filteredWallets, setFilteredWallets] = useState<Wallet[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [totalResults, setTotalResults] = useState(0);
+  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
   
   const fetchWallets = async () => {
     setIsLoading(true);
@@ -63,6 +75,22 @@ const Filter: React.FC = () => {
     }));
   };
   
+  const handlePatternTypeChange = (value: string) => {
+    setFilterOptions(prev => ({
+      ...prev,
+      patternType: value as SearchPatternType,
+      // Reset pattern length when changing type
+      patternLength: value === 'END' || value === 'START' ? 4 : 0,
+    }));
+  };
+  
+  const handlePatternLengthChange = (value: string) => {
+    setFilterOptions(prev => ({
+      ...prev,
+      patternLength: parseInt(value) || 0,
+    }));
+  };
+  
   const handlePatternChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFilterOptions(prev => ({
       ...prev,
@@ -78,6 +106,8 @@ const Filter: React.FC = () => {
     setFilterOptions({
       type: 'ALL',
       pattern: '',
+      patternType: 'ANY',
+      patternLength: 0,
       dateFrom: null,
       dateTo: null,
       limit: 100,
@@ -90,6 +120,28 @@ const Filter: React.FC = () => {
       title: "已复制",
       description: "地址已复制到剪贴板。",
     });
+  };
+  
+  const getPatternTypeLabel = () => {
+    switch (filterOptions.patternType) {
+      case 'ANY': return '任意位置';
+      case 'END': return `后${filterOptions.patternLength}位`;
+      case 'START': return `前${filterOptions.patternLength}位`;
+      case 'START_END': return '前后组合';
+      case 'CUSTOM': return `自定义${filterOptions.patternLength}位`;
+      default: return '选择搜索模式';
+    }
+  };
+  
+  const patternPlaceholder = () => {
+    switch (filterOptions.patternType) {
+      case 'ANY': return '输入完整或部分地址';
+      case 'END': return `输入后${filterOptions.patternLength}位`;
+      case 'START': return `输入前${filterOptions.patternLength}位`;
+      case 'START_END': return '格式: 开头+结尾 (例如: Tx+9z)';
+      case 'CUSTOM': return `输入${filterOptions.patternLength}位自定义模式`;
+      default: return '输入搜索模式';
+    }
   };
   
   return (
@@ -125,12 +177,47 @@ const Filter: React.FC = () => {
               </Select>
             </div>
             
-            <div className="space-y-2 md:col-span-2">
+            <div className="space-y-2">
+              <Label htmlFor="patternType">搜索模式</Label>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="w-full justify-between">
+                    {getPatternTypeLabel()}
+                    <Hash className="h-4 w-4 ml-2" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem onClick={() => handlePatternTypeChange('ANY')}>
+                    任意位置
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handlePatternTypeChange('END')}>
+                    后4位
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handlePatternTypeChange('END')}>
+                    后5位
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handlePatternTypeChange('END')}>
+                    后6位
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handlePatternTypeChange('START')}>
+                    前4位
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handlePatternTypeChange('START_END')}>
+                    前后组合 (例如: Tx+9z)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handlePatternTypeChange('CUSTOM')}>
+                    自定义位数
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            
+            <div className="space-y-2">
               <Label htmlFor="pattern">地址模式</Label>
               <div className="flex space-x-2">
                 <Input 
                   id="pattern" 
-                  placeholder="输入完整或部分地址" 
+                  placeholder={patternPlaceholder()} 
                   value={filterOptions.pattern}
                   onChange={handlePatternChange}
                 />
@@ -141,35 +228,46 @@ const Filter: React.FC = () => {
             </div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-            <div className="space-y-2">
-              <Label htmlFor="dateFrom">起始日期</Label>
-              <div className="flex space-x-2">
-                <Input 
-                  id="dateFrom" 
-                  placeholder="任何时间" 
-                  disabled
-                />
-                <Button variant="outline" size="icon" disabled>
-                  <Calendar className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="dateTo">结束日期</Label>
-              <div className="flex space-x-2">
-                <Input 
-                  id="dateTo" 
-                  placeholder="任何时间" 
-                  disabled
-                />
-                <Button variant="outline" size="icon" disabled>
-                  <Calendar className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </div>
+          <Collapsible 
+            open={isAdvancedOpen} 
+            onOpenChange={setIsAdvancedOpen}
+            className="mt-6"
+          >
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" className="flex w-full justify-between p-0">
+                <span>高级选项</span>
+                <span className="text-xs text-muted-foreground">
+                  {isAdvancedOpen ? '隐藏' : '显示'}
+                </span>
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-4">
+              {(filterOptions.patternType === 'END' || 
+                filterOptions.patternType === 'START' || 
+                filterOptions.patternType === 'CUSTOM') && (
+                <div className="mb-4">
+                  <Label htmlFor="patternLength" className="mb-2 block">
+                    位数长度
+                  </Label>
+                  <Select 
+                    value={filterOptions.patternLength.toString()} 
+                    onValueChange={handlePatternLengthChange}
+                  >
+                    <SelectTrigger className="w-full md:w-40">
+                      <SelectValue placeholder="选择位数" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="4">4位</SelectItem>
+                      <SelectItem value="5">5位</SelectItem>
+                      <SelectItem value="6">6位</SelectItem>
+                      <SelectItem value="8">8位</SelectItem>
+                      <SelectItem value="10">10位</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
           
           <div className="flex justify-between items-center mt-6">
             <div className="text-sm text-muted-foreground">
@@ -191,7 +289,7 @@ const Filter: React.FC = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
+          <ScrollArea className="h-[400px] rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -252,7 +350,7 @@ const Filter: React.FC = () => {
                 )}
               </TableBody>
             </Table>
-          </div>
+          </ScrollArea>
           
           {filteredWallets.length > 0 && (
             <div className="flex justify-between items-center mt-4">
