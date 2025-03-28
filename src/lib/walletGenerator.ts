@@ -1,4 +1,3 @@
-
 import { WalletType, Wallet, GeneratorConfig } from './types';
 
 // Mock implementation of a high-performance wallet generator

@@ -148,6 +148,7 @@ const Generator: React.FC = () => {
     }
   };
 
+  // Update this function to correctly filter by wallet type
   const getFilteredWallets = (type: 'TRC20' | 'ERC20') => {
     return recentWallets.filter(wallet => wallet.type === type);
   };
