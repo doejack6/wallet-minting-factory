@@ -7,6 +7,9 @@ class IndexedDBStorage {
   private storeName: string = 'wallets';
   private dbVersion: number = 1;
   private initPromise: Promise<void> | null = null;
+  private initInProgress: boolean = false;
+  private pendingOperations: Array<() => Promise<void>> = [];
+  private processingQueue: boolean = false;
   
   constructor() {
     this.initPromise = this.initDatabase();
@@ -14,7 +17,11 @@ class IndexedDBStorage {
   
   public async initDatabase(): Promise<void> {
     if (this.db) return Promise.resolve();
+    if (this.initInProgress) {
+      return this.initPromise || Promise.reject(new Error('Initialization already in progress but no promise found'));
+    }
     
+    this.initInProgress = true;
     console.log('Initializing IndexedDB database...');
     
     return new Promise((resolve, reject) => {
@@ -32,6 +39,7 @@ class IndexedDBStorage {
 
         request.onsuccess = (event) => {
           this.db = request.result;
+          this.initInProgress = false;
           console.log('IndexedDB connection established successfully');
           
           // Add event listeners for database errors
@@ -39,32 +47,71 @@ class IndexedDBStorage {
             console.error('IndexedDB error:', event);
           };
           
+          // Process any pending operations
+          this.processPendingOperations();
+          
           resolve();
         };
 
         request.onerror = (event) => {
+          this.initInProgress = false;
           const error = request.error?.message || 'Unknown error';
           console.error('IndexedDB initialization error:', error);
           reject(new Error(`Failed to initialize IndexedDB: ${error}`));
         };
       } catch (error) {
+        this.initInProgress = false;
         console.error('Exception during IndexedDB initialization:', error);
         reject(error);
       }
     });
   }
   
+  private async processPendingOperations() {
+    if (this.processingQueue || this.pendingOperations.length === 0) return;
+    this.processingQueue = true;
+    
+    console.log(`Processing ${this.pendingOperations.length} pending IndexedDB operations`);
+    
+    while (this.pendingOperations.length > 0) {
+      const operation = this.pendingOperations.shift();
+      if (operation) {
+        try {
+          await operation();
+        } catch (error) {
+          console.error('Error executing pending operation:', error);
+        }
+      }
+    }
+    
+    this.processingQueue = false;
+    console.log('Finished processing pending IndexedDB operations');
+  }
+  
   public async ensureConnection(): Promise<void> {
     if (this.db) return Promise.resolve();
-    return this.initPromise || this.initDatabase();
+    if (this.initPromise) {
+      return this.initPromise.then(() => {
+        if (!this.db) {
+          console.error('Database still not initialized after initialization promise resolved');
+          return this.initDatabase();
+        }
+      }).catch(error => {
+        console.error('Error waiting for initialization:', error);
+        return this.initDatabase();
+      });
+    }
+    return this.initDatabase();
   }
   
   public async loadAllWallets(): Promise<CompactWallet[]> {
-    await this.ensureConnection();
-    
     if (!this.db) {
-      console.error('Database not initialized after connection attempt');
-      return [];
+      await this.ensureConnection();
+      
+      if (!this.db) {
+        console.error('Database not initialized after connection attempt');
+        return [];
+      }
     }
 
     return new Promise((resolve, reject) => {
@@ -95,10 +142,35 @@ class IndexedDBStorage {
       return Promise.resolve();
     }
     
-    await this.ensureConnection();
-    
     if (!this.db) {
-      console.error('Database not initialized after connection attempt');
+      console.log('Database not ready, queueing saveWallets operation');
+      
+      return new Promise((resolve, reject) => {
+        const operation = async () => {
+          try {
+            await this.saveWalletsInternal(wallets);
+            resolve();
+          } catch (error) {
+            reject(error);
+          }
+        };
+        
+        this.pendingOperations.push(operation);
+        
+        this.ensureConnection()
+          .then(() => this.processPendingOperations())
+          .catch(error => {
+            console.error('Failed to ensure connection for pending operation:', error);
+            reject(error);
+          });
+      });
+    }
+    
+    return this.saveWalletsInternal(wallets);
+  }
+  
+  private async saveWalletsInternal(wallets: CompactWallet[]): Promise<void> {
+    if (!this.db) {
       return Promise.reject(new Error('Database not initialized'));
     }
 
@@ -113,6 +185,15 @@ class IndexedDBStorage {
         
         transaction.oncomplete = () => {
           console.log(`Successfully saved all ${wallets.length} wallets to IndexedDB`);
+          
+          // Dispatch a custom event to notify components about wallet storage
+          if (typeof window !== 'undefined') {
+            const event = new CustomEvent('walletsStored', { 
+              detail: { count: wallets.length, total: completed } 
+            });
+            window.dispatchEvent(event);
+          }
+          
           resolve();
         };
         
@@ -152,11 +233,13 @@ class IndexedDBStorage {
   }
   
   public async clearAllWallets(): Promise<void> {
-    await this.ensureConnection();
-    
     if (!this.db) {
-      console.error('Database not initialized after connection attempt');
-      return Promise.reject(new Error('Database not initialized'));
+      await this.ensureConnection();
+      
+      if (!this.db) {
+        console.error('Database not initialized after connection attempt');
+        return Promise.reject(new Error('Database not initialized'));
+      }
     }
     
     return new Promise((resolve, reject) => {
@@ -167,6 +250,13 @@ class IndexedDBStorage {
         
         request.onsuccess = () => {
           console.log('Successfully cleared all wallets from IndexedDB');
+          
+          // Dispatch a custom event to notify components
+          if (typeof window !== 'undefined') {
+            const event = new CustomEvent('databaseCleared');
+            window.dispatchEvent(event);
+          }
+          
           resolve();
         };
         
@@ -179,6 +269,19 @@ class IndexedDBStorage {
         reject(error);
       }
     });
+  }
+  
+  // Check if database is ready
+  public isDatabaseReady(): boolean {
+    return this.db !== null;
+  }
+  
+  // Get queue status
+  public getQueueStatus(): { pending: number, processing: boolean } {
+    return {
+      pending: this.pendingOperations.length,
+      processing: this.processingQueue
+    };
   }
 }
 
