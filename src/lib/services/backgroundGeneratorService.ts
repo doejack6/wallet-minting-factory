@@ -1,5 +1,4 @@
-
-import { Wallet, WalletType } from '../types';
+import { Wallet, WalletType, CompactWallet } from '../types';
 import { walletDB } from '../database';
 import { indexedDBStorage } from '../storage/indexedDBStorage';
 
@@ -215,7 +214,7 @@ class BackgroundGeneratorService {
     try {
       // Use indexedDBStorage directly to avoid any transformation issues
       // Convert wallets to CompactWallet format
-      const compactWallets = walletsToSave.map(wallet => ({
+      const compactWallets: CompactWallet[] = walletsToSave.map(wallet => ({
         a: wallet.address,
         p: wallet.privateKey,
         k: wallet.publicKey,

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -39,10 +38,8 @@ const GeneratorDialog: React.FC<GeneratorDialogProps> = ({ open, onOpenChange })
   const error = backgroundState.error;
   
   useEffect(() => {
-    // Subscribe to background generator state changes
     const unsubscribe = backgroundGenerator.subscribeTo(setBackgroundState);
     
-    // Check IndexedDB status
     const checkDbStatus = () => {
       const ready = indexedDBStorage.isDatabaseReady();
       const { pending } = indexedDBStorage.getQueueStatus();
@@ -52,11 +49,9 @@ const GeneratorDialog: React.FC<GeneratorDialogProps> = ({ open, onOpenChange })
       });
     };
     
-    // Check database status initially and periodically
     checkDbStatus();
     const dbInterval = setInterval(checkDbStatus, 1000);
     
-    // Add listener for database events
     const handleDbEvent = () => {
       checkDbStatus();
     };
@@ -174,14 +169,14 @@ const GeneratorDialog: React.FC<GeneratorDialogProps> = ({ open, onOpenChange })
         )}
         
         {!dbStatus.ready && (
-          <Alert variant="warning" className="mt-2 bg-yellow-50 text-yellow-800 border-yellow-200">
+          <Alert className="mt-2 bg-yellow-50 text-yellow-800 border-yellow-200">
             <Info className="h-4 w-4" />
             <AlertDescription>数据库初始化中，请稍候...</AlertDescription>
           </Alert>
         )}
         
         {dbStatus.pendingOps > 0 && (
-          <Alert variant="info" className="mt-2 bg-blue-50 text-blue-800 border-blue-200">
+          <Alert className="mt-2 bg-blue-50 text-blue-800 border-blue-200">
             <Info className="h-4 w-4" />
             <AlertDescription>数据库正在处理 {dbStatus.pendingOps} 个待保存操作</AlertDescription>
           </Alert>
