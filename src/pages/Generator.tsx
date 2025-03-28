@@ -64,16 +64,16 @@ const Generator: React.FC = () => {
       walletGenerator.stop();
       setIsRunning(false);
       toast({
-        title: "Generator Stopped",
-        description: "Wallet generation process has been paused.",
+        title: "生成器已停止",
+        description: "钱包生成进程已暂停。",
       });
     } else {
       walletGenerator.setTargetSpeed(targetSpeed);
       walletGenerator.start();
       setIsRunning(true);
       toast({
-        title: "Generator Started",
-        description: "Wallet generation process has begun.",
+        title: "生成器已启动",
+        description: "钱包生成进程已开始。",
       });
     }
   };
@@ -99,36 +99,36 @@ const Generator: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Wallet Generator</h1>
+        <h1 className="text-2xl font-bold">钱包生成器</h1>
         <Button 
           onClick={toggleGenerator}
           className={isRunning ? "bg-red-500 hover:bg-red-600" : "bg-green-500 hover:bg-green-600"}
         >
-          {isRunning ? <><Pause className="mr-2 h-4 w-4" /> Stop Generator</> : <><Play className="mr-2 h-4 w-4" /> Start Generator</>}
+          {isRunning ? <><Pause className="mr-2 h-4 w-4" /> 停止生成器</> : <><Play className="mr-2 h-4 w-4" /> 启动生成器</>}
         </Button>
       </div>
       
       <Alert>
         <AlertTriangle className="h-4 w-4" />
-        <AlertTitle>Offline Mode</AlertTitle>
+        <AlertTitle>离线模式</AlertTitle>
         <AlertDescription>
-          All wallets are generated locally and not sent to any external servers. Private keys are stored securely in your local database.
+          所有钱包均在本地生成，不会发送到任何外部服务器。私钥安全地存储在本地数据库中。
         </AlertDescription>
       </Alert>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Generator Control Panel</CardTitle>
+            <CardTitle>生成器控制面板</CardTitle>
             <CardDescription>
-              Configure wallet generation settings and monitor performance
+              配置钱包生成设置并监控性能
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-3">
               <div className="flex justify-between">
-                <h3 className="text-sm font-medium">Generation Speed</h3>
-                <span className="text-sm font-medium">{formatNumber(targetSpeed)} wallets/sec</span>
+                <h3 className="text-sm font-medium">生成速度</h3>
+                <span className="text-sm font-medium">{formatNumber(targetSpeed)} 钱包/秒</span>
               </div>
               <Slider 
                 value={[targetSpeed]} 
@@ -139,34 +139,34 @@ const Generator: React.FC = () => {
                 disabled={isRunning}
               />
               <div className="flex justify-between text-xs text-muted-foreground">
-                <span>10,000/sec</span>
-                <span>100,000/sec</span>
-                <span>1,000,000/sec</span>
+                <span>10,000/秒</span>
+                <span>100,000/秒</span>
+                <span>1,000,000/秒</span>
               </div>
             </div>
             
             <div className="flex items-center space-x-2">
               <Switch id="autosave" checked={autoSave} onCheckedChange={setAutoSave} />
-              <Label htmlFor="autosave">Auto-save to Database</Label>
+              <Label htmlFor="autosave">自动保存到数据库</Label>
             </div>
             
             <div className="grid grid-cols-2 gap-4">
               <div className="p-4 bg-secondary rounded-lg">
-                <div className="text-xs text-muted-foreground mb-1">Generation Rate</div>
-                <div className="text-2xl font-bold">{formatNumber(currentSpeed)}<span className="text-xs text-muted-foreground">/sec</span></div>
+                <div className="text-xs text-muted-foreground mb-1">生成速率</div>
+                <div className="text-2xl font-bold">{formatNumber(currentSpeed)}<span className="text-xs text-muted-foreground">/秒</span></div>
                 <div className="mt-2 flex items-center text-xs text-muted-foreground">
                   <TrendingUp className="h-3 w-3 mr-1" />
                   {currentSpeed > 0 
-                    ? `${Math.floor((currentSpeed / targetSpeed) * 100)}% of target` 
-                    : 'Generator not running'}
+                    ? `目标的 ${Math.floor((currentSpeed / targetSpeed) * 100)}%` 
+                    : '生成器未运行'}
                 </div>
               </div>
               
               <div className="p-4 bg-secondary rounded-lg">
-                <div className="text-xs text-muted-foreground mb-1">Total Generated</div>
+                <div className="text-xs text-muted-foreground mb-1">已生成总数</div>
                 <div className="text-2xl font-bold">{formatNumber(generatedCount)}</div>
                 <div className="mt-2 text-xs text-muted-foreground">
-                  Runtime: {formatTime(elapsedTime)}
+                  运行时间: {formatTime(elapsedTime)}
                 </div>
               </div>
             </div>
@@ -175,7 +175,7 @@ const Generator: React.FC = () => {
               {isRunning && (
                 <div className="flex items-center">
                   <div className="dot-pulse mr-3"></div>
-                  <span className="text-sm">Generating wallets...</span>
+                  <span className="text-sm">正在生成钱包...</span>
                 </div>
               )}
             </div>
@@ -184,11 +184,11 @@ const Generator: React.FC = () => {
             <div className="w-full flex justify-between">
               <Button variant="outline" size="sm">
                 <Settings className="mr-2 h-4 w-4" />
-                Advanced Settings
+                高级设置
               </Button>
               <Button variant="outline" size="sm">
                 <RefreshCw className="mr-2 h-4 w-4" />
-                Reset Counter
+                重置计数器
               </Button>
             </div>
           </CardFooter>
@@ -197,7 +197,7 @@ const Generator: React.FC = () => {
         <Card>
           <Tabs defaultValue="trc20">
             <CardHeader className="pb-0">
-              <CardTitle>Generated Wallets</CardTitle>
+              <CardTitle>已生成的钱包</CardTitle>
               <TabsList className="mt-2">
                 <TabsTrigger value="trc20">TRC20</TabsTrigger>
                 <TabsTrigger value="erc20">ERC20</TabsTrigger>
@@ -211,7 +211,7 @@ const Generator: React.FC = () => {
                     .map((wallet, index) => (
                       <div key={index} className="p-3 bg-secondary rounded-md text-xs">
                         <div className="flex justify-between items-center mb-1">
-                          <span className="font-medium">TRC20 Wallet</span>
+                          <span className="font-medium">TRC20 钱包</span>
                           <span className="text-muted-foreground">
                             {wallet.createdAt.toLocaleTimeString()}
                           </span>
@@ -224,7 +224,7 @@ const Generator: React.FC = () => {
                   
                   {recentWallets.filter(wallet => wallet.type === 'TRC20').length === 0 && (
                     <div className="text-center py-6 text-muted-foreground">
-                      No TRC20 wallets generated yet.
+                      尚未生成 TRC20 钱包。
                     </div>
                   )}
                 </div>
@@ -237,7 +237,7 @@ const Generator: React.FC = () => {
                     .map((wallet, index) => (
                       <div key={index} className="p-3 bg-secondary rounded-md text-xs">
                         <div className="flex justify-between items-center mb-1">
-                          <span className="font-medium">ERC20 Wallet</span>
+                          <span className="font-medium">ERC20 钱包</span>
                           <span className="text-muted-foreground">
                             {wallet.createdAt.toLocaleTimeString()}
                           </span>
@@ -250,7 +250,7 @@ const Generator: React.FC = () => {
                   
                   {recentWallets.filter(wallet => wallet.type === 'ERC20').length === 0 && (
                     <div className="text-center py-6 text-muted-foreground">
-                      No ERC20 wallets generated yet.
+                      尚未生成 ERC20 钱包。
                     </div>
                   )}
                 </div>

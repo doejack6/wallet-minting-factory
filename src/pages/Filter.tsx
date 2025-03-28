@@ -47,8 +47,8 @@ const Filter: React.FC = () => {
     } catch (error) {
       console.error('Failed to fetch wallets', error);
       toast({
-        title: "Filter Error",
-        description: "Failed to fetch wallets from database.",
+        title: "筛选错误",
+        description: "从数据库获取钱包失败。",
         variant: "destructive",
       });
     } finally {
@@ -87,50 +87,50 @@ const Filter: React.FC = () => {
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast({
-      title: "Copied",
-      description: "Address copied to clipboard.",
+      title: "已复制",
+      description: "地址已复制到剪贴板。",
     });
   };
   
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Filter Wallets</h1>
+        <h1 className="text-2xl font-bold">筛选钱包</h1>
         <Button variant="outline" onClick={handleClear}>
           <RefreshCw className="mr-2 h-4 w-4" />
-          Clear Filters
+          清除筛选条件
         </Button>
       </div>
       
       <Card>
         <CardHeader>
-          <CardTitle>Search Criteria</CardTitle>
+          <CardTitle>搜索条件</CardTitle>
           <CardDescription>
-            Filter wallets by address pattern, type, and other criteria
+            按地址模式、类型和其他条件筛选钱包
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="space-y-2">
-              <Label htmlFor="type">Wallet Type</Label>
+              <Label htmlFor="type">钱包类型</Label>
               <Select value={filterOptions.type} onValueChange={handleTypeChange}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select wallet type" />
+                  <SelectValue placeholder="选择钱包类型" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ALL">All Types</SelectItem>
-                  <SelectItem value="TRC20">TRC20 Only</SelectItem>
-                  <SelectItem value="ERC20">ERC20 Only</SelectItem>
+                  <SelectItem value="ALL">所有类型</SelectItem>
+                  <SelectItem value="TRC20">仅 TRC20</SelectItem>
+                  <SelectItem value="ERC20">仅 ERC20</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="pattern">Address Pattern</Label>
+              <Label htmlFor="pattern">地址模式</Label>
               <div className="flex space-x-2">
                 <Input 
                   id="pattern" 
-                  placeholder="Enter full or partial address" 
+                  placeholder="输入完整或部分地址" 
                   value={filterOptions.pattern}
                   onChange={handlePatternChange}
                 />
@@ -143,11 +143,11 @@ const Filter: React.FC = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
             <div className="space-y-2">
-              <Label htmlFor="dateFrom">From Date</Label>
+              <Label htmlFor="dateFrom">起始日期</Label>
               <div className="flex space-x-2">
                 <Input 
                   id="dateFrom" 
-                  placeholder="Any time" 
+                  placeholder="任何时间" 
                   disabled
                 />
                 <Button variant="outline" size="icon" disabled>
@@ -157,11 +157,11 @@ const Filter: React.FC = () => {
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="dateTo">To Date</Label>
+              <Label htmlFor="dateTo">结束日期</Label>
               <div className="flex space-x-2">
                 <Input 
                   id="dateTo" 
-                  placeholder="Any time" 
+                  placeholder="任何时间" 
                   disabled
                 />
                 <Button variant="outline" size="icon" disabled>
@@ -174,10 +174,10 @@ const Filter: React.FC = () => {
           <div className="flex justify-between items-center mt-6">
             <div className="text-sm text-muted-foreground">
               <FilterIcon className="inline-block h-4 w-4 mr-1" />
-              Total database entries: {walletDB.getTotalCount().toLocaleString()}
+              数据库总条目: {walletDB.getTotalCount().toLocaleString()}
             </div>
             <Button onClick={handleSearch} disabled={isLoading}>
-              {isLoading ? 'Searching...' : 'Search Wallets'}
+              {isLoading ? '搜索中...' : '搜索钱包'}
             </Button>
           </div>
         </CardContent>
@@ -185,9 +185,9 @@ const Filter: React.FC = () => {
       
       <Card>
         <CardHeader>
-          <CardTitle>Search Results</CardTitle>
+          <CardTitle>搜索结果</CardTitle>
           <CardDescription>
-            Found {totalResults.toLocaleString()} wallet{totalResults !== 1 ? 's' : ''} matching your criteria
+            找到 {totalResults.toLocaleString()} 个符合条件的钱包
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -195,10 +195,10 @@ const Filter: React.FC = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-20">Type</TableHead>
-                  <TableHead>Wallet Address</TableHead>
-                  <TableHead className="w-36">Created At</TableHead>
-                  <TableHead className="w-20 text-right">Actions</TableHead>
+                  <TableHead className="w-20">类型</TableHead>
+                  <TableHead>钱包地址</TableHead>
+                  <TableHead className="w-36">创建时间</TableHead>
+                  <TableHead className="w-20 text-right">操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -221,7 +221,7 @@ const Filter: React.FC = () => {
                           variant="ghost" 
                           size="icon" 
                           onClick={() => copyToClipboard(wallet.address)}
-                          title="Copy address"
+                          title="复制地址"
                         >
                           <Copy className="h-4 w-4" />
                         </Button>
@@ -236,7 +236,7 @@ const Filter: React.FC = () => {
                           <div className="dot-pulse"></div>
                         </div>
                       ) : (
-                        'No wallets found matching your criteria'
+                        '未找到符合条件的钱包'
                       )}
                     </TableCell>
                   </TableRow>
@@ -248,10 +248,10 @@ const Filter: React.FC = () => {
           {filteredWallets.length > 0 && (
             <div className="flex justify-between items-center mt-4">
               <div className="text-sm text-muted-foreground">
-                Showing {filteredWallets.length} of {totalResults} results
+                显示 {filteredWallets.length} 条，共 {totalResults} 条结果
               </div>
               <Button variant="outline" size="sm" disabled>
-                Load More
+                加载更多
               </Button>
             </div>
           )}

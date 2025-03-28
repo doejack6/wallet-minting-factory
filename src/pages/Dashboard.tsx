@@ -87,14 +87,14 @@ const Dashboard: React.FC = () => {
     if (walletGenerator.isRunning()) {
       walletGenerator.stop();
       toast({
-        title: "Generator Stopped",
-        description: "Wallet generation process has been paused.",
+        title: "生成器已停止",
+        description: "钱包生成进程已暂停。",
       });
     } else {
       walletGenerator.start();
       toast({
-        title: "Generator Started",
-        description: "Wallet generation process has begun.",
+        title: "生成器已启动",
+        description: "钱包生成进程已开始。",
       });
     }
   };
@@ -114,12 +114,12 @@ const Dashboard: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <h1 className="text-2xl font-bold">仪表盘</h1>
         <Button 
           onClick={toggleGenerator}
           className={status.running ? "bg-red-500 hover:bg-red-600" : "bg-green-500 hover:bg-green-600"}
         >
-          {status.running ? <><Pause className="mr-2 h-4 w-4" /> Stop Generator</> : <><Play className="mr-2 h-4 w-4" /> Start Generator</>}
+          {status.running ? <><Pause className="mr-2 h-4 w-4" /> 停止生成器</> : <><Play className="mr-2 h-4 w-4" /> 启动生成器</>}
         </Button>
       </div>
       
@@ -128,32 +128,32 @@ const Dashboard: React.FC = () => {
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex items-center">
               <Activity className="mr-2 h-5 w-5 text-crypto-green" />
-              Generation Status
+              生成状态
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Status</span>
+                <span className="text-muted-foreground">状态</span>
                 <span className={`px-2 py-1 rounded text-xs ${status.running ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                  {status.running ? 'Running' : 'Stopped'}
+                  {status.running ? '运行中' : '已停止'}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Current Speed</span>
-                <span className="font-medium">{formatNumber(status.currentSpeed)}/sec</span>
+                <span className="text-muted-foreground">当前速度</span>
+                <span className="font-medium">{formatNumber(status.currentSpeed)}/秒</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Target Speed</span>
-                <span className="font-medium">{formatNumber(status.targetSpeed)}/sec</span>
+                <span className="text-muted-foreground">目标速度</span>
+                <span className="font-medium">{formatNumber(status.targetSpeed)}/秒</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">CPU Usage</span>
+                <span className="text-muted-foreground">CPU使用率</span>
                 <span className="font-medium">{status.cpuUsage}%</span>
               </div>
               <div className="pt-2">
                 <div className="flex justify-between text-xs mb-1">
-                  <span>Performance</span>
+                  <span>性能</span>
                   <span>{Math.min(100, Math.floor((status.currentSpeed / status.targetSpeed) * 100))}%</span>
                 </div>
                 <Progress value={Math.min(100, Math.floor((status.currentSpeed / status.targetSpeed) * 100))} className="h-2" />
@@ -166,33 +166,33 @@ const Dashboard: React.FC = () => {
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex items-center">
               <Cpu className="mr-2 h-5 w-5 text-crypto-purple" />
-              Generator Stats
+              生成器统计
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Total Generated</span>
+                <span className="text-muted-foreground">总计生成</span>
                 <span className="font-medium">{formatNumber(generatorStats.totalGenerated)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">TRC20 Wallets</span>
+                <span className="text-muted-foreground">TRC20钱包</span>
                 <span className="font-medium">{formatNumber(generatorStats.trc20Count)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">ERC20 Wallets</span>
+                <span className="text-muted-foreground">ERC20钱包</span>
                 <span className="font-medium">{formatNumber(generatorStats.erc20Count)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Uptime</span>
+                <span className="text-muted-foreground">运行时间</span>
                 <span className="font-medium">{formatTime(generatorStats.uptime)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Last Generated</span>
+                <span className="text-muted-foreground">最近生成</span>
                 <span className="font-medium">
                   {generatorStats.lastGenerated 
                     ? generatorStats.lastGenerated.toLocaleTimeString() 
-                    : 'N/A'}
+                    : '无'}
                 </span>
               </div>
             </div>
@@ -203,34 +203,34 @@ const Dashboard: React.FC = () => {
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex items-center">
               <Database className="mr-2 h-5 w-5 text-crypto-blue" />
-              Database Stats
+              数据库统计
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Total Stored</span>
+                <span className="text-muted-foreground">已存储总数</span>
                 <span className="font-medium">{formatNumber(dbStats.totalStored)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Database Size</span>
+                <span className="text-muted-foreground">数据库大小</span>
                 <span className="font-medium">{dbStats.databaseSize}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Write Speed</span>
-                <span className="font-medium">{formatNumber(dbStats.writeSpeed)}/sec</span>
+                <span className="text-muted-foreground">写入速度</span>
+                <span className="font-medium">{formatNumber(dbStats.writeSpeed)}/秒</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Last Write</span>
+                <span className="text-muted-foreground">最近写入</span>
                 <span className="font-medium">
                   {dbStats.lastWrite 
                     ? dbStats.lastWrite.toLocaleTimeString() 
-                    : 'N/A'}
+                    : '无'}
                 </span>
               </div>
               <div className="pt-2">
                 <div className="flex justify-between text-xs mb-1">
-                  <span>Storage Efficiency</span>
+                  <span>存储效率</span>
                   <span>{Math.min(100, Math.floor((dbStats.totalStored / (generatorStats.totalGenerated || 1)) * 100))}%</span>
                 </div>
                 <Progress 
@@ -247,21 +247,21 @@ const Dashboard: React.FC = () => {
         <Tabs defaultValue="recent">
           <div className="flex justify-between items-center mb-4">
             <TabsList>
-              <TabsTrigger value="recent">Recent Wallets</TabsTrigger>
-              <TabsTrigger value="status">System Status</TabsTrigger>
+              <TabsTrigger value="recent">最近生成的钱包</TabsTrigger>
+              <TabsTrigger value="status">系统状态</TabsTrigger>
             </TabsList>
             <Button variant="outline" size="sm">
               <RefreshCw className="mr-2 h-4 w-4" />
-              Refresh
+              刷新
             </Button>
           </div>
           
           <TabsContent value="recent" className="mt-0">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle>Recently Generated Wallets</CardTitle>
+                <CardTitle>最近生成的钱包</CardTitle>
                 <CardDescription>
-                  The last 5 generated wallet addresses are shown below
+                  以下显示最近生成的5个钱包地址
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -282,7 +282,7 @@ const Dashboard: React.FC = () => {
                   
                   {walletGenerator.getLastBatch(5).length === 0 && (
                     <div className="text-center py-6 text-muted-foreground">
-                      No wallets generated yet. Start the generator to see results.
+                      尚未生成钱包。启动生成器以查看结果。
                     </div>
                   )}
                 </div>
@@ -293,18 +293,18 @@ const Dashboard: React.FC = () => {
           <TabsContent value="status" className="mt-0">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle>System Status</CardTitle>
+                <CardTitle>系统状态</CardTitle>
                 <CardDescription>
-                  Current performance metrics and system resources
+                  当前性能指标和系统资源
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   <div>
-                    <h3 className="text-sm font-medium mb-2">CPU Usage</h3>
+                    <h3 className="text-sm font-medium mb-2">CPU使用率</h3>
                     <div className="space-y-2">
                       <div className="flex justify-between text-xs mb-1">
-                        <span>Core Utilization</span>
+                        <span>核心利用率</span>
                         <span>{status.cpuUsage}%</span>
                       </div>
                       <Progress value={status.cpuUsage} className="h-2" />
@@ -312,10 +312,10 @@ const Dashboard: React.FC = () => {
                   </div>
                   
                   <div>
-                    <h3 className="text-sm font-medium mb-2">Memory Usage</h3>
+                    <h3 className="text-sm font-medium mb-2">内存使用率</h3>
                     <div className="space-y-2">
                       <div className="flex justify-between text-xs mb-1">
-                        <span>RAM Allocation</span>
+                        <span>内存分配</span>
                         <span>{status.memoryUsage}</span>
                       </div>
                       <Progress value={60} className="h-2" />
@@ -323,7 +323,7 @@ const Dashboard: React.FC = () => {
                   </div>
                   
                   <div>
-                    <h3 className="text-sm font-medium mb-2">Thread Allocation</h3>
+                    <h3 className="text-sm font-medium mb-2">线程分配</h3>
                     <div className="grid grid-cols-8 gap-2">
                       {Array.from({ length: status.threads }).map((_, i) => (
                         <div 
@@ -337,15 +337,15 @@ const Dashboard: React.FC = () => {
                   </div>
                   
                   <div className="pt-2">
-                    <h3 className="text-sm font-medium mb-2">System Information</h3>
+                    <h3 className="text-sm font-medium mb-2">系统信息</h3>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="p-3 bg-secondary rounded-md">
-                        <div className="text-xs text-muted-foreground mb-1">Database Engine</div>
-                        <div className="text-sm">High-Performance Local DB</div>
+                        <div className="text-xs text-muted-foreground mb-1">数据库引擎</div>
+                        <div className="text-sm">高性能本地数据库</div>
                       </div>
                       <div className="p-3 bg-secondary rounded-md">
-                        <div className="text-xs text-muted-foreground mb-1">Generation Engine</div>
-                        <div className="text-sm">Multi-threaded Cryptography</div>
+                        <div className="text-xs text-muted-foreground mb-1">生成引擎</div>
+                        <div className="text-sm">多线程加密技术</div>
                       </div>
                     </div>
                   </div>

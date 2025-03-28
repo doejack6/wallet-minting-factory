@@ -7,7 +7,6 @@ import {
   SidebarGroup, 
   SidebarGroupContent, 
   SidebarGroupLabel, 
-  SidebarHeader, 
   SidebarMenu, 
   SidebarMenuButton, 
   SidebarMenuItem 
@@ -26,13 +25,13 @@ const AppSidebar = () => {
   const location = useLocation();
   
   const navigation = [
-    { name: 'Dashboard', href: '/', icon: Home },
-    { name: 'Generator', href: '/generator', icon: Wallet },
-    { name: 'Database', href: '/database', icon: Database },
-    { name: 'Filter', href: '/filter', icon: Filter },
-    { name: 'Analytics', href: '/analytics', icon: BarChart },
-    { name: 'Activity', href: '/activity', icon: Activity },
-    { name: 'Settings', href: '/settings', icon: Settings },
+    { name: '仪表盘', href: '/', icon: Home },
+    { name: '钱包生成器', href: '/generator', icon: Wallet },
+    { name: '数据库', href: '/database', icon: Database },
+    { name: '筛选器', href: '/filter', icon: Filter },
+    { name: '分析', href: '/analytics', icon: BarChart },
+    { name: '活动', href: '/activity', icon: Activity },
+    { name: '设置', href: '/settings', icon: Settings },
   ];
 
   return (
@@ -40,12 +39,12 @@ const AppSidebar = () => {
       <SidebarHeader className="p-4">
         <div className="flex items-center space-x-2">
           <Wallet className="h-6 w-6 text-primary" />
-          <span className="text-xl font-bold">WalletFactory</span>
+          <span className="text-xl font-bold">钱包工厂</span>
         </div>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+          <SidebarGroupLabel>导航菜单</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {navigation.map((item) => (

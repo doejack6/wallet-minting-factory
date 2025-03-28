@@ -16,8 +16,8 @@ const Header = () => {
         </Button>
         <div className="flex items-center space-x-2">
           <div className="text-sm text-right mr-2">
-            <div className="font-medium">Admin</div>
-            <div className="text-muted-foreground text-xs">Local System</div>
+            <div className="font-medium">管理员</div>
+            <div className="text-muted-foreground text-xs">本地系统</div>
           </div>
           <Button variant="ghost" size="icon">
             <User className="h-5 w-5" />

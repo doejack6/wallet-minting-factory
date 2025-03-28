@@ -58,14 +58,14 @@ const Database: React.FC = () => {
     try {
       await walletDB.storeWallets(walletGenerator.getLastBatch(10000));
       toast({
-        title: "Success",
-        description: "Wallets successfully saved to database.",
+        title: "成功",
+        description: "钱包已成功保存到数据库。",
       });
     } catch (error) {
       console.error('Failed to save wallets', error);
       toast({
-        title: "Error",
-        description: "Failed to save wallets to database.",
+        title: "错误",
+        description: "保存钱包到数据库失败。",
         variant: "destructive",
       });
     } finally {
@@ -74,19 +74,19 @@ const Database: React.FC = () => {
   };
   
   const handleClearDatabase = async () => {
-    if (window.confirm('Are you sure you want to clear the database? This action cannot be undone.')) {
+    if (window.confirm('确定要清空数据库吗？此操作无法撤销。')) {
       setIsLoading(true);
       try {
         await walletDB.clearDatabase();
         toast({
-          title: "Database Cleared",
-          description: "All wallet records have been removed from the database.",
+          title: "数据库已清空",
+          description: "所有钱包记录已从数据库中删除。",
         });
       } catch (error) {
         console.error('Failed to clear database', error);
         toast({
-          title: "Error",
-          description: "Failed to clear the database.",
+          title: "错误",
+          description: "清空数据库失败。",
           variant: "destructive",
         });
       } finally {
@@ -107,15 +107,15 @@ const Database: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Database Management</h1>
+        <h1 className="text-2xl font-bold">数据库管理</h1>
         <div className="space-x-2">
           <Button variant="outline" onClick={handleManualSave} disabled={isLoading}>
             <Save className="mr-2 h-4 w-4" />
-            Manual Save
+            手动保存
           </Button>
           <Button variant="destructive" onClick={handleClearDatabase} disabled={isLoading}>
             <Trash2 className="mr-2 h-4 w-4" />
-            Clear Database
+            清空数据库
           </Button>
         </div>
       </div>
@@ -123,30 +123,30 @@ const Database: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Database Statistics</CardTitle>
+            <CardTitle>数据库统计</CardTitle>
             <CardDescription>
-              Current storage metrics and performance indicators
+              当前存储指标和性能指标
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="p-4 bg-secondary rounded-lg">
-                <div className="text-xs text-muted-foreground mb-1">Total Stored</div>
+                <div className="text-xs text-muted-foreground mb-1">总存储量</div>
                 <div className="text-2xl font-bold">{formatNumber(dbStats.totalStored)}</div>
               </div>
               
               <div className="p-4 bg-secondary rounded-lg">
-                <div className="text-xs text-muted-foreground mb-1">TRC20 Wallets</div>
+                <div className="text-xs text-muted-foreground mb-1">TRC20钱包</div>
                 <div className="text-2xl font-bold">{formatNumber(dbStats.trc20Count)}</div>
               </div>
               
               <div className="p-4 bg-secondary rounded-lg">
-                <div className="text-xs text-muted-foreground mb-1">ERC20 Wallets</div>
+                <div className="text-xs text-muted-foreground mb-1">ERC20钱包</div>
                 <div className="text-2xl font-bold">{formatNumber(dbStats.erc20Count)}</div>
               </div>
               
               <div className="p-4 bg-secondary rounded-lg">
-                <div className="text-xs text-muted-foreground mb-1">Database Size</div>
+                <div className="text-xs text-muted-foreground mb-1">数据库大小</div>
                 <div className="text-2xl font-bold">{dbStats.databaseSize}</div>
               </div>
             </div>
@@ -154,7 +154,7 @@ const Database: React.FC = () => {
             <div className="space-y-4">
               <div>
                 <div className="flex justify-between text-sm mb-2">
-                  <span>Storage Usage</span>
+                  <span>存储使用率</span>
                   <span>25%</span>
                 </div>
                 <Progress value={25} className="h-2" />
@@ -162,23 +162,23 @@ const Database: React.FC = () => {
               
               <div>
                 <div className="flex justify-between text-sm mb-2">
-                  <span>Write Performance</span>
-                  <span>{formatNumber(dbStats.writeSpeed)}/sec</span>
+                  <span>写入性能</span>
+                  <span>{formatNumber(dbStats.writeSpeed)}/秒</span>
                 </div>
                 <Progress value={80} className="h-2" />
               </div>
             </div>
             
             <div className="pt-2">
-              <h3 className="text-sm font-medium mb-3">Database Activity</h3>
+              <h3 className="text-sm font-medium mb-3">数据库活动</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-3 bg-secondary rounded-md">
-                  <div className="text-xs text-muted-foreground mb-1">Last Write Operation</div>
+                  <div className="text-xs text-muted-foreground mb-1">最近写入操作</div>
                   <div className="text-sm">{formatTime(dbStats.lastWrite)}</div>
                 </div>
                 <div className="p-3 bg-secondary rounded-md">
-                  <div className="text-xs text-muted-foreground mb-1">Write Speed</div>
-                  <div className="text-sm">{formatNumber(dbStats.writeSpeed)} wallets/second</div>
+                  <div className="text-xs text-muted-foreground mb-1">写入速度</div>
+                  <div className="text-sm">{formatNumber(dbStats.writeSpeed)} 钱包/秒</div>
                 </div>
               </div>
             </div>
@@ -187,9 +187,9 @@ const Database: React.FC = () => {
         
         <Card>
           <CardHeader>
-            <CardTitle>Distribution</CardTitle>
+            <CardTitle>分布情况</CardTitle>
             <CardDescription>
-              Wallet type distribution in database
+              数据库中钱包类型分布
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-2">
@@ -199,7 +199,7 @@ const Database: React.FC = () => {
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="text-center">
                       <div className="text-3xl font-bold">{dbStats.totalStored.toLocaleString()}</div>
-                      <div className="text-xs text-muted-foreground">Total Wallets</div>
+                      <div className="text-xs text-muted-foreground">钱包总数</div>
                     </div>
                   </div>
                   <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
@@ -227,7 +227,7 @@ const Database: React.FC = () => {
               ) : (
                 <div className="text-center text-muted-foreground">
                   <DatabaseIcon className="h-16 w-16 mx-auto mb-4 opacity-20" />
-                  <p>No data available</p>
+                  <p>暂无数据</p>
                 </div>
               )}
             </div>
@@ -261,21 +261,21 @@ const Database: React.FC = () => {
       <Tabs defaultValue="performance">
         <div className="flex justify-between items-center mb-4">
           <TabsList>
-            <TabsTrigger value="performance">Performance</TabsTrigger>
-            <TabsTrigger value="security">Security</TabsTrigger>
+            <TabsTrigger value="performance">性能</TabsTrigger>
+            <TabsTrigger value="security">安全</TabsTrigger>
           </TabsList>
           <Button variant="outline" size="sm">
             <RefreshCw className="mr-2 h-4 w-4" />
-            Refresh Stats
+            刷新统计
           </Button>
         </div>
         
         <TabsContent value="performance" className="mt-0">
           <Card>
             <CardHeader>
-              <CardTitle>Database Performance</CardTitle>
+              <CardTitle>数据库性能</CardTitle>
               <CardDescription>
-                Optimized for high-throughput wallet storage and fast queries
+                优化高吞吐量钱包存储和快速查询
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -284,36 +284,36 @@ const Database: React.FC = () => {
                   <div className="p-4 bg-secondary rounded-lg">
                     <div className="flex items-center mb-2">
                       <HardDrive className="h-5 w-5 mr-2 text-muted-foreground" />
-                      <div className="text-sm font-medium">Storage Engine</div>
+                      <div className="text-sm font-medium">存储引擎</div>
                     </div>
-                    <div className="text-xs text-muted-foreground">High-Performance Local Storage</div>
-                    <div className="mt-2 text-sm">Optimized for high-volume writes</div>
+                    <div className="text-xs text-muted-foreground">高性能本地存储</div>
+                    <div className="mt-2 text-sm">针对高容量写入优化</div>
                   </div>
                   
                   <div className="p-4 bg-secondary rounded-lg">
                     <div className="flex items-center mb-2">
                       <BarChart4 className="h-5 w-5 mr-2 text-muted-foreground" />
-                      <div className="text-sm font-medium">Query Performance</div>
+                      <div className="text-sm font-medium">查询性能</div>
                     </div>
-                    <div className="text-xs text-muted-foreground">Indexed Search</div>
-                    <div className="mt-2 text-sm">Sub-millisecond query response</div>
+                    <div className="text-xs text-muted-foreground">索引搜索</div>
+                    <div className="mt-2 text-sm">亚毫秒级查询响应</div>
                   </div>
                   
                   <div className="p-4 bg-secondary rounded-lg">
                     <div className="flex items-center mb-2">
                       <DatabaseIcon className="h-5 w-5 mr-2 text-muted-foreground" />
-                      <div className="text-sm font-medium">Data Compression</div>
+                      <div className="text-sm font-medium">数据压缩</div>
                     </div>
-                    <div className="text-xs text-muted-foreground">Optimized Storage</div>
-                    <div className="mt-2 text-sm">Efficient data serialization</div>
+                    <div className="text-xs text-muted-foreground">优化存储</div>
+                    <div className="mt-2 text-sm">高效数据序列化</div>
                   </div>
                 </div>
                 
                 <Alert>
                   <AlertTriangle className="h-4 w-4" />
-                  <AlertTitle>Local Storage Only</AlertTitle>
+                  <AlertTitle>仅本地存储</AlertTitle>
                   <AlertDescription>
-                    All wallet data is stored locally on your device. No data is sent to external servers.
+                    所有钱包数据仅存储在您的设备上。不会发送到外部服务器。
                   </AlertDescription>
                 </Alert>
               </div>
@@ -324,44 +324,44 @@ const Database: React.FC = () => {
         <TabsContent value="security" className="mt-0">
           <Card>
             <CardHeader>
-              <CardTitle>Security Information</CardTitle>
+              <CardTitle>安全信息</CardTitle>
               <CardDescription>
-                Data protection and privacy measures
+                数据保护和隐私措施
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <Alert>
                   <AlertTriangle className="h-4 w-4" />
-                  <AlertTitle>Warning: Private Keys Storage</AlertTitle>
+                  <AlertTitle>警告：私钥存储</AlertTitle>
                   <AlertDescription>
-                    Private keys are stored in plaintext for demonstration purposes. In a production environment, encrypted storage with proper key management should be implemented.
+                    私钥以明文形式存储仅用于演示目的。在生产环境中，应实施带有适当密钥管理的加密存储。
                   </AlertDescription>
                 </Alert>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                   <div className="p-4 bg-secondary rounded-lg">
-                    <div className="text-sm font-medium mb-2">Data Isolation</div>
+                    <div className="text-sm font-medium mb-2">数据隔离</div>
                     <div className="text-xs">
-                      All generated wallet data is stored locally and isolated from external networks. No data is synced to cloud services or external servers.
+                      所有生成的钱包数据都在本地存储，与外部网络隔离。数据不会同步到云服务或外部服务器。
                     </div>
                   </div>
                   
                   <div className="p-4 bg-secondary rounded-lg">
-                    <div className="text-sm font-medium mb-2">Secure Random Generation</div>
+                    <div className="text-sm font-medium mb-2">安全随机生成</div>
                     <div className="text-xs">
-                      Wallet generation uses cryptographically secure random number generators to ensure private keys cannot be predicted or reproduced.
+                      钱包生成使用加密安全的随机数生成器，确保私钥不能被预测或重现。
                     </div>
                   </div>
                 </div>
                 
                 <div className="p-4 bg-secondary rounded-lg mt-4">
-                  <div className="text-sm font-medium mb-2">Security Recommendations</div>
+                  <div className="text-sm font-medium mb-2">安全建议</div>
                   <ul className="text-xs space-y-2">
-                    <li>• Regularly backup your wallet database to prevent data loss</li>
-                    <li>• Store backups in secure, encrypted storage</li>
-                    <li>• Consider implementing additional encryption for private key storage</li>
-                    <li>• For production use, consider hardware security modules (HSMs)</li>
+                    <li>• 定期备份您的钱包数据库以防止数据丢失</li>
+                    <li>• 将备份存储在安全的加密存储中</li>
+                    <li>• 考虑为私钥存储实施额外的加密</li>
+                    <li>• 对于生产用途，请考虑硬件安全模块(HSM)</li>
                   </ul>
                 </div>
               </div>
