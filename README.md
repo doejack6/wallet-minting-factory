@@ -4,17 +4,60 @@
 
 **URL**: https://lovable.dev/projects/42500577-b37a-482d-9d9c-730f309906e1
 
-## How can I edit this code?
+## Docker 部署指南
 
-There are several ways of editing your application.
+### 先决条件
+- 安装 Docker
+- 安装 Docker Compose
 
-**Use Lovable**
+### 快速部署步骤
+
+1. 克隆仓库
+```bash
+git clone <YOUR_GIT_URL>
+cd <YOUR_PROJECT_NAME>
+```
+
+2. 构建并启动容器
+```bash
+docker-compose up -d --build
+```
+
+### Docker 命令
+
+- 启动容器: `docker-compose up -d`
+- 停止容器: `docker-compose down`
+- 查看运行中的容器: `docker-compose ps`
+- 查看容器日志: `docker-compose logs wallet-factory`
+
+### 配置说明
+
+- 默认端口: 80
+- 服务名称: wallet-factory
+- 容器重启策略: always
+
+### 性能优化
+
+- Nginx 配置已优化静态资源缓存
+- 多阶段构建减小镜像体积
+- 使用轻量级 Alpine Linux 镜像
+
+### 故障排查
+
+如遇到问题，请检查:
+- Docker 版本是否兼容
+- 端口 80 是否被占用
+- 网络连接是否正常
+
+## 其他部署方式
+
+- Use Lovable
 
 Simply visit the [Lovable Project](https://lovable.dev/projects/42500577-b37a-482d-9d9c-730f309906e1) and start prompting.
 
 Changes made via Lovable will be committed automatically to this repo.
 
-**Use your preferred IDE**
+- Use your preferred IDE
 
 If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
 
@@ -36,13 +79,13 @@ npm i
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+- Edit a file directly in GitHub
 
 - Navigate to the desired file(s).
 - Click the "Edit" button (pencil icon) at the top right of the file view.
 - Make your changes and commit the changes.
 
-**Use GitHub Codespaces**
+- Use GitHub Codespaces
 
 - Navigate to the main page of your repository.
 - Click on the "Code" button (green button) near the top right.
