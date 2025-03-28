@@ -24,7 +24,9 @@ const PrivateKey: React.FC = () => {
           // Use the database to get the wallet by ID
           const wallets = await walletDB.getWallets({ 
             type: 'ALL', 
-            pattern: '', 
+            pattern: '',
+            patternType: 'ANY', // Add the missing property
+            patternLength: 0,    // Add the missing property
             dateFrom: null, 
             dateTo: null, 
             limit: 1000 
