@@ -13,23 +13,15 @@ import {
   SidebarHeader 
 } from '@/components/ui/sidebar';
 import { 
-  Home, 
-  Wallet, 
-  Database, 
-  Filter, 
-  Settings, 
+  BarChart, 
   Activity, 
-  BarChart 
+  Settings 
 } from 'lucide-react';
 
 const AppSidebar = () => {
   const location = useLocation();
   
   const navigation = [
-    { name: '仪表盘', href: '/', icon: Home },
-    { name: '钱包生成器', href: '/generator', icon: Wallet },
-    { name: '数据库', href: '/database', icon: Database },
-    { name: '筛选器', href: '/filter', icon: Filter },
     { name: '分析', href: '/analytics', icon: BarChart },
     { name: '活动', href: '/activity', icon: Activity },
     { name: '设置', href: '/settings', icon: Settings },
@@ -39,7 +31,6 @@ const AppSidebar = () => {
     <Sidebar>
       <SidebarHeader className="p-4">
         <div className="flex items-center space-x-2">
-          <Wallet className="h-6 w-6 text-primary" />
           <span className="text-xl font-bold">钱包工厂</span>
         </div>
       </SidebarHeader>
