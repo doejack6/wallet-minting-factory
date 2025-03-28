@@ -1,5 +1,4 @@
-
-import { WalletType, Wallet, GeneratorConfig } from './types';
+import { Wallet, WalletType } from './types';
 import { walletDB } from './database';
 
 // Mock implementation of a high-performance wallet generator
@@ -244,25 +243,24 @@ export class WalletGeneratorEngine {
   }
   
   private async syncWithDatabase() {
-    // Only sync a limited number of wallets to database to maintain performance
     if (!this.running) return;
     
     const batchToSave = this.getLastBatch(1000);
     if (batchToSave.length > 0) {
       try {
-        await walletDB.storeWallets(batchToSave);
+        const uniqueWallets = batchToSave.filter(
+          (wallet, index, self) => 
+            self.findIndex(w => w.address === wallet.address) === index
+        );
+        
+        await walletDB.storeWallets(uniqueWallets);
+        
         this.savedToDbCount = walletDB.getTotalCount();
         
-        // Log the sync
-        console.log(`Generator: Synced ${batchToSave.length} wallets. DB count: ${this.savedToDbCount}`);
-        
-        // Adjust real generated count if needed to ensure it's always >= savedToDbCount
         if (this.realGeneratedCount < this.savedToDbCount) {
           this.realGeneratedCount = this.savedToDbCount;
-          console.log(`Generator: Adjusted generated count to ${this.realGeneratedCount}`);
         }
         
-        // Notify progress
         if (this.onProgress) {
           this.onProgress({
             count: this.realGeneratedCount,
@@ -270,6 +268,8 @@ export class WalletGeneratorEngine {
             savedCount: this.savedToDbCount
           });
         }
+        
+        console.log(`Generator: Synced ${uniqueWallets.length} unique wallets. Total in DB: ${this.savedToDbCount}`);
       } catch (error) {
         console.error('Failed to sync wallets with database', error);
       }
@@ -279,30 +279,22 @@ export class WalletGeneratorEngine {
   private runGenerationCycle(): void {
     if (!this.running) return;
     
-    // For demo purposes, we generate a smaller batch
-    // In real implementation this would be done in a more efficient way
     const batchSize = Math.min(this.config.batchSize, Math.floor(this.targetSpeed / 20));
     
-    // Calculate how many of each type to generate based on ratio
     const trc20Count = Math.round(batchSize * (this.config.trc20Ratio / 100));
     const erc20Count = batchSize - trc20Count;
     
-    // Generate wallets according to configured ratio
     const trc20Batch = generateWalletBatch(trc20Count, 'TRC20');
     const erc20Batch = generateWalletBatch(erc20Count, 'ERC20');
     
-    // Combine the batches
     const newBatch = [...trc20Batch, ...erc20Batch];
     
-    // Store for recent access (limited to recent wallets for demo)
     this.wallets = [...this.wallets, ...newBatch].slice(-1000);
     
-    // Increment counters
     this.generatedCount += newBatch.length;
     this.realGeneratedCount += newBatch.length;
     this.todayGenerated += newBatch.length;
     
-    // Calculate generation speed
     const now = Date.now();
     const elapsed = (now - this.lastSpeedUpdate) / 1000;
     
@@ -311,7 +303,6 @@ export class WalletGeneratorEngine {
       this.lastSample = this.generatedCount;
       this.lastSpeedUpdate = now;
       
-      // Notify progress
       if (this.onProgress) {
         this.onProgress({
           count: this.realGeneratedCount,
@@ -321,12 +312,9 @@ export class WalletGeneratorEngine {
       }
     }
     
-    // Schedule next cycle based on thread count (simulated)
-    // In real implementation, we would adjust this based on performance metrics
-    const cycleTime = 50 / this.config.threadCount; // Adjust cycle time based on thread count
+    const cycleTime = 50 / this.config.threadCount;
     setTimeout(() => this.runGenerationCycle(), cycleTime);
   }
 }
 
-// Create singleton instance
 export const walletGenerator = new WalletGeneratorEngine();

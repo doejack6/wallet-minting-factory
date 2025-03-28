@@ -34,19 +34,23 @@ class WalletDatabase {
   public async storeWallets(wallets: Wallet[]): Promise<void> {
     if (!wallets || wallets.length === 0) return;
     
-    // Use Set for faster duplicate detection
-    const uniqueWallets = wallets.filter(wallet => !this.addressSet.has(wallet.address));
+    // More robust duplicate detection
+    const uniqueWallets = wallets.filter(wallet => {
+      // Check if address already exists in the database
+      const isDuplicate = this.wallets.some(
+        existingWallet => existingWallet.address === wallet.address
+      );
+      return !isDuplicate;
+    });
     
     if (uniqueWallets.length === 0) return;
     
-    // Add new addresses to the set
-    uniqueWallets.forEach(wallet => this.addressSet.add(wallet.address));
-    
+    // Add new unique wallets
     this.wallets = [...this.wallets, ...uniqueWallets];
     this.lastWrite = new Date();
     this.todayCount += uniqueWallets.length;
     
-    // More robust write speed calculation
+    // More precise write speed calculation
     const now = Date.now();
     const elapsed = (now - this.lastSpeedUpdate) / 1000;
     
@@ -56,14 +60,7 @@ class WalletDatabase {
       this.lastCount = this.wallets.length;
     }
     
-    // Notify external systems that new wallets have been stored
-    if (typeof window !== 'undefined' && window.dispatchEvent) {
-      window.dispatchEvent(new CustomEvent('walletsStored', { 
-        detail: { count: uniqueWallets.length, total: this.wallets.length }
-      }));
-    }
-
-    console.log(`Database: Stored ${uniqueWallets.length} wallets. Total: ${this.wallets.length}`);
+    console.log(`Database: Stored ${uniqueWallets.length} unique wallets. Total: ${this.wallets.length}`);
   }
   
   public async getWallets(options: FilterOptions): Promise<Wallet[]> {
