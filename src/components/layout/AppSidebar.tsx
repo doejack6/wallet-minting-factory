@@ -9,7 +9,8 @@ import {
   SidebarGroupLabel, 
   SidebarMenu, 
   SidebarMenuButton, 
-  SidebarMenuItem 
+  SidebarMenuItem,
+  SidebarHeader 
 } from '@/components/ui/sidebar';
 import { 
   Home, 
