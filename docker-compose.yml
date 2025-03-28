@@ -16,7 +16,7 @@ services:
       - wallet-data:/data
     environment:
       - NODE_ENV=production
-      # Pass server information to the application
+      # 传递服务器信息到应用
       - SERVER_CPU_CORES=${SERVER_CPU_CORES:-16}
       - SERVER_MEMORY_MB=${SERVER_MEMORY_MB:-32768}
 

@@ -1,10 +1,10 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
-import { Cpu, Server, Memory } from 'lucide-react';
+import { Cpu, Server, Database } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { GeneratorConfig } from '@/lib/types';
@@ -24,11 +24,26 @@ const ServerConfigPanel: React.FC<ServerConfigPanelProps> = ({
 }) => {
   const { toast } = useToast();
   const [manualCores, setManualCores] = useState<number>(
-    navigator.hardwareConcurrency || 16
+    Number(process.env.SERVER_CPU_CORES) || navigator.hardwareConcurrency || 16
   );
   const [manualMemory, setManualMemory] = useState<number>(
-    Math.max(2048, config.memoryLimit)
+    Number(process.env.SERVER_MEMORY_MB) || Math.max(2048, config.memoryLimit)
   );
+
+  // 组件挂载时检查环境变量
+  useEffect(() => {
+    // 获取服务器环境变量（如果通过Docker设置）
+    if (typeof window !== 'undefined') {
+      // 尝试从window对象获取服务器信息（如果通过Docker设置）
+      if ((window as any).SERVER_CPU_CORES) {
+        setManualCores(Number((window as any).SERVER_CPU_CORES));
+      }
+      
+      if ((window as any).SERVER_MEMORY_MB) {
+        setManualMemory(Number((window as any).SERVER_MEMORY_MB));
+      }
+    }
+  }, []);
   
   const updateConfig = (key: keyof GeneratorConfig, value: any) => {
     if (!isRunning) {
@@ -103,7 +118,7 @@ const ServerConfigPanel: React.FC<ServerConfigPanelProps> = ({
           
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <Memory className="h-4 w-4" />
+              <Database className="h-4 w-4" />
               <Label htmlFor="server-memory">服务器内存 (MB)</Label>
             </div>
             <Input
