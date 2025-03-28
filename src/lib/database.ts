@@ -1,7 +1,7 @@
 import { Wallet, WalletType, FilterOptions, DatabaseStats, CompactWallet } from './types';
+import { indexedDBStorage } from './storage/indexedDBStorage';
 
 class WalletDatabase {
-  private db: IDBDatabase | null = null;
   private wallets: CompactWallet[] = [];
   private lastWrite: Date | null = null;
   private writeSpeed = 0;
@@ -38,47 +38,28 @@ class WalletDatabase {
   }
 
   private async initDatabase(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open('WalletDatabase', 1);
-
-      request.onupgradeneeded = (event) => {
-        const db = request.result;
-        if (!db.objectStoreNames.contains('wallets')) {
-          db.createObjectStore('wallets', { keyPath: 'a' });
-        }
-      };
-
-      request.onsuccess = async (event) => {
-        this.db = request.result;
-        await this.loadWalletsFromIndexedDB();
-        resolve();
-      };
-
-      request.onerror = (event) => {
-        console.error('IndexedDB initialization error', event);
-        reject(event);
-      };
-    });
+    try {
+      // Load wallets from IndexedDB
+      await this.loadWalletsFromIndexedDB();
+    } catch (error) {
+      console.error('Error initializing database:', error);
+    }
   }
 
   private async loadWalletsFromIndexedDB(): Promise<void> {
-    if (!this.db) return;
-
-    return new Promise((resolve, reject) => {
-      const transaction = this.db.transaction(['wallets'], 'readonly');
-      const store = transaction.objectStore('wallets');
-      const request = store.getAll();
-
-      request.onsuccess = (event) => {
-        this.wallets = request.result || [];
-        resolve();
-      };
-
-      request.onerror = (event) => {
-        console.error('Failed to load wallets from IndexedDB', event);
-        reject(event);
-      };
-    });
+    try {
+      const wallets = await indexedDBStorage.loadAllWallets();
+      this.wallets = wallets;
+      console.log(`Loaded ${wallets.length} wallets from IndexedDB`);
+      
+      // Rebuild address set
+      this.addressSet.clear();
+      for (const wallet of this.wallets) {
+        this.addressSet.add(wallet.a);
+      }
+    } catch (error) {
+      console.error('Failed to load wallets from IndexedDB', error);
+    }
   }
   
   // Utility functions for conversion between Wallet and CompactWallet
@@ -155,8 +136,9 @@ class WalletDatabase {
     
     try {
       // Convert to compact format if compression is enabled
+      const compactWallets = wallets.map(wallet => this.compactifyWallet(wallet));
+      
       if (this.compressionEnabled) {
-        const compactWallets = wallets.map(wallet => this.compactifyWallet(wallet));
         this.wallets.push(...compactWallets);
       } else {
         // Store in original format (as CompactWallet but without actual compression)
@@ -199,15 +181,7 @@ class WalletDatabase {
       }
       
       // 持久化到 IndexedDB
-      if (this.db) {
-        const transaction = this.db.transaction(['wallets'], 'readwrite');
-        const store = transaction.objectStore('wallets');
-        
-        wallets.forEach(wallet => {
-          const compactWallet = this.compactifyWallet(wallet);
-          store.put(compactWallet);
-        });
-      }
+      await indexedDBStorage.saveWallets(compactWallets);
       
       console.log(`Database: Stored ${wallets.length} wallets in ${Date.now() - startTime}ms. Total: ${this.wallets.length}`);
     } catch (error) {
@@ -467,11 +441,7 @@ class WalletDatabase {
     this.writeQueue = []; // 清空写入队列
     
     // 清空 IndexedDB
-    if (this.db) {
-      const transaction = this.db.transaction(['wallets'], 'readwrite');
-      const store = transaction.objectStore('wallets');
-      store.clear();
-    }
+    await indexedDBStorage.clearAllWallets();
     
     // Notify that database was cleared using event system
     if (typeof window !== 'undefined' && window.dispatchEvent) {
