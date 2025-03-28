@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,6 +11,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { walletGenerator } from '@/lib/walletGenerator';
 import { walletDB } from '@/lib/database';
 import { useToast } from '@/components/ui/use-toast';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const Generator: React.FC = () => {
   const { toast } = useToast();
@@ -19,6 +19,7 @@ const Generator: React.FC = () => {
   const [targetSpeed, setTargetSpeed] = useState(100000);
   const [currentSpeed, setCurrentSpeed] = useState(0);
   const [autoSave, setAutoSave] = useState(true);
+  const [saveFrequency, setSaveFrequency] = useState<number>(1000); // 保存频率，默认1000ms（1秒）
   const [generatedCount, setGeneratedCount] = useState(0);
   const [recentWallets, setRecentWallets] = useState<any[]>([]);
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -34,31 +35,34 @@ const Generator: React.FC = () => {
       setGeneratedCount(stats.count);
     });
     
-    // Update UI every second
-    const interval = setInterval(() => {
+    // Update UI every second and save to database based on saveFrequency
+    const uiUpdateInterval = setInterval(() => {
       if (walletGenerator.isRunning()) {
         setElapsedTime(walletGenerator.getUptime());
         setRecentWallets(walletGenerator.getLastBatch(10));
-        
-        // Auto-save to database if enabled
-        if (autoSave) {
-          walletDB.storeWallets(walletGenerator.getLastBatch(1000))
-            .catch(error => {
-              console.error('Failed to save wallets to database', error);
-              toast({
-                title: "Database Error",
-                description: "Failed to save wallets to database.",
-                variant: "destructive",
-              });
-            });
-        }
       }
     }, 1000);
     
+    // Set up separate interval for database saving based on saveFrequency
+    const dbSaveInterval = setInterval(() => {
+      if (walletGenerator.isRunning() && autoSave) {
+        walletDB.storeWallets(walletGenerator.getLastBatch(1000))
+          .catch(error => {
+            console.error('Failed to save wallets to database', error);
+            toast({
+              title: "Database Error",
+              description: "Failed to save wallets to database.",
+              variant: "destructive",
+            });
+          });
+      }
+    }, saveFrequency);
+    
     return () => {
-      clearInterval(interval);
+      clearInterval(uiUpdateInterval);
+      clearInterval(dbSaveInterval);
     };
-  }, [autoSave, toast]);
+  }, [autoSave, toast, saveFrequency]);
   
   const toggleGenerator = () => {
     if (isRunning) {
@@ -113,7 +117,7 @@ const Generator: React.FC = () => {
       });
     }
   };
-  
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -163,9 +167,36 @@ const Generator: React.FC = () => {
               </div>
             </div>
             
-            <div className="flex items-center space-x-2">
-              <Switch id="autosave" checked={autoSave} onCheckedChange={setAutoSave} />
-              <Label htmlFor="autosave">自动保存到数据库</Label>
+            <div className="flex flex-col space-y-4">
+              <div className="flex items-center space-x-2">
+                <Switch id="autosave" checked={autoSave} onCheckedChange={setAutoSave} />
+                <Label htmlFor="autosave">自动保存到数据库</Label>
+              </div>
+              
+              {autoSave && (
+                <div className="ml-7">
+                  <Label htmlFor="save-frequency" className="text-sm mb-2 block">保存频率</Label>
+                  <Select
+                    value={saveFrequency.toString()}
+                    onValueChange={(value) => setSaveFrequency(Number(value))}
+                    disabled={isRunning}
+                  >
+                    <SelectTrigger id="save-frequency" className="w-full">
+                      <SelectValue placeholder="选择保存频率" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="100">非常快 (100毫秒)</SelectItem>
+                      <SelectItem value="500">快速 (500毫秒)</SelectItem>
+                      <SelectItem value="1000">正常 (1秒)</SelectItem>
+                      <SelectItem value="5000">慢速 (5秒)</SelectItem>
+                      <SelectItem value="10000">很慢 (10秒)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    频率越高，对系统性能要求越高。请根据您的硬件情况选择合适的频率。
+                  </p>
+                </div>
+              )}
             </div>
             
             <div className="grid grid-cols-2 gap-4">
