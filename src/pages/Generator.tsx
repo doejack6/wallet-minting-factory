@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertTriangle, Play, Pause, Settings, RefreshCw, TrendingUp } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { walletGenerator } from '@/lib/walletGenerator';
 import { walletDB } from '@/lib/database';
 import { useToast } from '@/components/ui/use-toast';
@@ -94,6 +95,23 @@ const Generator: React.FC = () => {
     const secs = Math.floor(seconds % 60);
     
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const resetCounter = () => {
+    if (!isRunning) {
+      setGeneratedCount(0);
+      setElapsedTime(0);
+      toast({
+        title: "计数器已重置",
+        description: "钱包生成统计数据已被重置。",
+      });
+    } else {
+      toast({
+        title: "无法重置",
+        description: "请先停止生成器，然后再重置计数器。",
+        variant: "destructive",
+      });
+    }
   };
   
   return (
@@ -182,11 +200,56 @@ const Generator: React.FC = () => {
           </CardContent>
           <CardFooter>
             <div className="w-full flex justify-between">
-              <Button variant="outline" size="sm">
-                <Settings className="mr-2 h-4 w-4" />
-                高级设置
-              </Button>
-              <Button variant="outline" size="sm">
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Settings className="mr-2 h-4 w-4" />
+                    高级设置
+                  </Button>
+                </SheetTrigger>
+                <SheetContent>
+                  <SheetHeader>
+                    <SheetTitle>高级设置</SheetTitle>
+                    <SheetDescription>
+                      配置钱包生成器的高级选项
+                    </SheetDescription>
+                  </SheetHeader>
+                  <div className="py-4 space-y-4">
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-medium">生成比例</h3>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="p-4 bg-secondary rounded-lg">
+                          <div className="text-xs text-muted-foreground mb-1">TRC20</div>
+                          <div className="text-lg font-bold">50%</div>
+                        </div>
+                        <div className="p-4 bg-secondary rounded-lg">
+                          <div className="text-xs text-muted-foreground mb-1">ERC20</div>
+                          <div className="text-lg font-bold">50%</div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-medium">性能设置</h3>
+                      <div className="p-4 bg-secondary rounded-lg space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs">线程数</span>
+                          <span className="text-xs font-medium">4</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs">批处理大小</span>
+                          <span className="text-xs font-medium">1000</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs">内存限制</span>
+                          <span className="text-xs font-medium">512MB</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </SheetContent>
+              </Sheet>
+              <Button variant="outline" size="sm" onClick={resetCounter}>
                 <RefreshCw className="mr-2 h-4 w-4" />
                 重置计数器
               </Button>

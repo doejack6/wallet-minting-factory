@@ -7,8 +7,6 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import AppLayout from "./components/layout/AppLayout";
 import NotFound from "./pages/NotFound";
 import Analytics from "./pages/Analytics";
-import Activity from "./pages/Activity";
-import Settings from "./pages/Settings";
 import Generator from "./pages/Generator";
 import Filter from "./pages/Filter";
 import Database from "./pages/Database";
@@ -61,22 +59,6 @@ const App = () => (
             element={
               <AppLayout>
                 <Database />
-              </AppLayout>
-            } 
-          />
-          <Route 
-            path="/activity" 
-            element={
-              <AppLayout>
-                <Activity />
-              </AppLayout>
-            } 
-          />
-          <Route 
-            path="/settings" 
-            element={
-              <AppLayout>
-                <Settings />
               </AppLayout>
             } 
           />

@@ -14,8 +14,6 @@ import {
 } from '@/components/ui/sidebar';
 import { 
   BarChart, 
-  Activity, 
-  Settings,
   Wallet,
   Filter,
   Database
@@ -29,8 +27,6 @@ const AppSidebar = () => {
     { name: '生成器', href: '/generator', icon: Wallet },
     { name: '筛选', href: '/filter', icon: Filter },
     { name: '数据库', href: '/database', icon: Database },
-    { name: '活动', href: '/activity', icon: Activity },
-    { name: '设置', href: '/settings', icon: Settings },
   ];
 
   return (
