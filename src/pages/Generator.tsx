@@ -50,6 +50,7 @@ const Generator: React.FC = () => {
   const [isOpenPerformanceInfo, setIsOpenPerformanceInfo] = useState(false);
   const [showGeneratorDialog, setShowGeneratorDialog] = useState(false);
   const [backgroundState, setBackgroundState] = useState<BackgroundGenState>(backgroundGenerator.getState());
+  const [generatorError, setGeneratorError] = useState<string | null>(null);
   
   const [config, setConfig] = useState<GeneratorConfig>({
     trc20Ratio: 50,
@@ -75,6 +76,7 @@ const Generator: React.FC = () => {
     
     const unsubscribe = backgroundGenerator.subscribeTo(state => {
       setBackgroundState(state);
+      setGeneratorError(state.error);
     });
     
     walletGenerator.setOnProgress((stats) => {
@@ -150,14 +152,24 @@ const Generator: React.FC = () => {
         description: "钱包生成进程已暂停。",
       });
     } else {
-      walletGenerator.setTargetSpeed(targetSpeed);
-      walletGenerator.setConfig(config);
-      walletGenerator.start();
-      setIsRunning(true);
-      toast({
-        title: "生成器已启动",
-        description: "钱包生成进程已开始。",
-      });
+      try {
+        walletGenerator.setTargetSpeed(targetSpeed);
+        walletGenerator.setConfig(config);
+        walletGenerator.start();
+        setIsRunning(true);
+        setGeneratorError(null);
+        toast({
+          title: "生成器已启动",
+          description: "钱包生成进程已开始。",
+        });
+      } catch (error) {
+        console.error('Failed to start generator:', error);
+        toast({
+          title: "生成器启动失败",
+          description: error instanceof Error ? error.message : "未知错误",
+          variant: "destructive",
+        });
+      }
     }
   };
   
@@ -305,6 +317,14 @@ const Generator: React.FC = () => {
           </Button>
         </div>
       </div>
+      
+      {generatorError && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>生成器错误</AlertTitle>
+          <AlertDescription>{generatorError}</AlertDescription>
+        </Alert>
+      )}
       
       {backgroundState.isRunning && (
         <Alert className="bg-blue-50 border-blue-200">

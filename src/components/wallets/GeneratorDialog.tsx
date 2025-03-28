@@ -11,6 +11,8 @@ import { walletGenerator } from '@/lib/walletGenerator';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Slider } from '@/components/ui/slider';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertCircle } from 'lucide-react';
 
 interface GeneratorDialogProps {
   open: boolean;
@@ -29,6 +31,7 @@ const GeneratorDialog: React.FC<GeneratorDialogProps> = ({ open, onOpenChange })
   const generatedCount = backgroundState.generatedCount;
   const progress = backgroundState.progress;
   const generationSpeed = backgroundState.speed;
+  const error = backgroundState.error;
   
   useEffect(() => {
     // Subscribe to background generator state changes
@@ -120,6 +123,13 @@ const GeneratorDialog: React.FC<GeneratorDialogProps> = ({ open, onOpenChange })
             设置要生成的钱包数量和类型。生成将在后台进行，即使关闭此对话框或页面，进度也会保持。
           </DialogDescription>
         </DialogHeader>
+        
+        {error && (
+          <Alert variant="destructive" className="mt-2">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
         
         <div className="space-y-4 py-4">
           <div className="space-y-2">

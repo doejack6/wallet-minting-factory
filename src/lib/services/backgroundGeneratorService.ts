@@ -11,6 +11,7 @@ export interface BackgroundGenState {
   speed: number;
   progress: number;
   lastUpdate: Date | null;
+  error: string | null;
 }
 
 class BackgroundGeneratorService {
@@ -19,6 +20,8 @@ class BackgroundGeneratorService {
   private pendingWallets: Wallet[] = [];
   private saveInterval: number | null = null;
   private statusInterval: number | null = null;
+  private initRetryCount = 0;
+  private maxRetries = 3;
   
   private state: BackgroundGenState = {
     isRunning: false,
@@ -27,7 +30,8 @@ class BackgroundGeneratorService {
     startTime: null,
     speed: 0,
     progress: 0,
-    lastUpdate: null
+    lastUpdate: null,
+    error: null
   };
   
   private stateListeners: Set<(state: BackgroundGenState) => void> = new Set();
@@ -35,6 +39,7 @@ class BackgroundGeneratorService {
   constructor() {
     // Initialize the worker if we're in a browser
     if (typeof window !== 'undefined') {
+      console.log('Initializing background generator service...');
       this.initWorker();
       
       // Add a beforeunload event listener to prevent accidental closing
@@ -51,9 +56,11 @@ class BackgroundGeneratorService {
   
   private initWorker() {
     try {
+      console.log('Creating wallet generator worker...');
       this.worker = new Worker(new URL('../workers/walletGeneratorWorker.ts', import.meta.url), { type: 'module' });
       
       this.worker.addEventListener('message', this.handleWorkerMessage);
+      this.worker.addEventListener('error', this.handleWorkerError);
       
       // Set up periodic saving of pending wallets
       this.saveInterval = window.setInterval(() => {
@@ -67,9 +74,46 @@ class BackgroundGeneratorService {
         }
       }, 1000);
       
+      console.log('Worker initialized successfully');
+      
     } catch (error) {
       console.error('Failed to initialize wallet generator worker:', error);
+      this.updateState({
+        error: `初始化钱包生成器失败: ${error instanceof Error ? error.message : String(error)}`
+      });
+      
+      // Retry initialization after delay if we haven't reached max retries
+      if (this.initRetryCount < this.maxRetries) {
+        this.initRetryCount++;
+        console.log(`Retrying worker initialization (attempt ${this.initRetryCount}/${this.maxRetries})...`);
+        setTimeout(() => this.initWorker(), 2000);
+      }
     }
+  }
+  
+  private handleWorkerError = (event: ErrorEvent) => {
+    console.error('Worker error:', event);
+    this.updateState({
+      error: `钱包生成器工作线程错误: ${event.message}`
+    });
+    
+    // Attempt to restart the worker
+    this.restartWorker();
+  };
+  
+  private restartWorker() {
+    console.log('Attempting to restart worker...');
+    
+    // Terminate the current worker
+    if (this.worker) {
+      this.worker.terminate();
+      this.worker = null;
+    }
+    
+    this.isWorkerReady = false;
+    
+    // Reinitialize the worker
+    setTimeout(() => this.initWorker(), 1000);
   }
   
   private handleWorkerMessage = (event: MessageEvent) => {
@@ -77,7 +121,9 @@ class BackgroundGeneratorService {
     
     switch (action) {
       case 'ready':
+        console.log('Worker is ready');
         this.isWorkerReady = true;
+        this.updateState({ error: null });
         break;
       
       case 'wallets':
@@ -88,7 +134,8 @@ class BackgroundGeneratorService {
         this.updateState({
           generatedCount: data.generatedCount || this.state.generatedCount,
           speed: data.speed || this.state.speed,
-          lastUpdate: new Date()
+          lastUpdate: new Date(),
+          error: null
         });
         
         // If generation is complete, mark as not running
@@ -107,7 +154,8 @@ class BackgroundGeneratorService {
         this.updateState({
           generatedCount: data.generatedCount,
           progress: data.progress,
-          lastUpdate: new Date()
+          lastUpdate: new Date(),
+          error: null
         });
         break;
       
@@ -116,7 +164,8 @@ class BackgroundGeneratorService {
           isRunning: false,
           generatedCount: data.generatedCount,
           progress: 100,
-          lastUpdate: new Date()
+          lastUpdate: new Date(),
+          error: null
         });
         break;
       
@@ -124,6 +173,13 @@ class BackgroundGeneratorService {
         this.updateState({ 
           isRunning: false,
           lastUpdate: new Date()
+        });
+        break;
+        
+      case 'error':
+        console.error('Worker reported error:', data.message);
+        this.updateState({
+          error: data.message
         });
         break;
     }
@@ -141,6 +197,10 @@ class BackgroundGeneratorService {
       console.error('Failed to save pending wallets:', error);
       // Put the wallets back in the queue
       this.pendingWallets = [...walletsToSave, ...this.pendingWallets];
+      
+      this.updateState({
+        error: `保存钱包数据失败: ${error instanceof Error ? error.message : String(error)}`
+      });
     }
   }
   
@@ -158,8 +218,19 @@ class BackgroundGeneratorService {
   }
   
   public startGeneration(count: number, walletTypes: WalletType[] = ['TRC20', 'ERC20'], trc20Ratio: number = 50) {
-    if (!this.worker || !this.isWorkerReady) {
+    if (!this.worker) {
+      console.error('Worker is not initialized');
+      this.updateState({
+        error: '钱包生成器未初始化，请刷新页面重试'
+      });
+      return;
+    }
+    
+    if (!this.isWorkerReady) {
       console.error('Worker is not ready');
+      this.updateState({
+        error: '钱包生成器未就绪，请等待几秒后重试'
+      });
       return;
     }
     
@@ -174,8 +245,11 @@ class BackgroundGeneratorService {
       generatedCount: 0,
       startTime: new Date(),
       speed: 0,
-      progress: 0
+      progress: 0,
+      error: null
     });
+    
+    console.log(`Starting generation of ${count} wallets with types:`, walletTypes, `TRC20 ratio: ${trc20Ratio}%`);
     
     this.worker.postMessage({
       action: 'start',
