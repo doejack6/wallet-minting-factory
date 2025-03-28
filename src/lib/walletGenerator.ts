@@ -75,6 +75,7 @@ export class WalletGeneratorEngine {
   private onProgress: ((stats: { count: number, speed: number, savedCount: number }) => void) | null = null;
   private syncInterval: number | null = null;
   private dbSyncInterval: number | null = null;
+  private addressSet: Set<string> = new Set(); // For tracking unique addresses
   
   // Advanced configuration options
   private config: GeneratorConfig = {
@@ -104,10 +105,13 @@ export class WalletGeneratorEngine {
     if (typeof window !== 'undefined') {
       window.addEventListener('walletsStored', (e: any) => {
         this.savedToDbCount = e.detail.total;
+        console.log(`WalletGenerator: Updated saved count to ${this.savedToDbCount}`);
       });
       
       window.addEventListener('databaseCleared', () => {
         this.savedToDbCount = 0;
+        this.addressSet.clear();
+        console.log('WalletGenerator: Database cleared event received');
       });
     }
     
@@ -163,18 +167,18 @@ export class WalletGeneratorEngine {
     // Ensure we have correct database count before starting
     this.synchronizeWithDatabase();
     
-    // Set up recurring database sync at longer intervals
+    // Set up recurring database sync at shorter intervals for more accuracy
     if (this.syncInterval === null) {
       this.syncInterval = window.setInterval(() => {
         this.synchronizeWithDatabase();
-      }, 10000); // Check every 10 seconds
+      }, 5000); // Check every 5 seconds
     }
     
     // Set up automatic sync to database at a reasonable interval to avoid too frequent syncing
     if (this.dbSyncInterval === null) {
       this.dbSyncInterval = window.setInterval(() => {
         this.syncWithDatabase();
-      }, 3000); // Sync every 3 seconds
+      }, 2000); // Sync every 2 seconds
     }
     
     this.runGenerationCycle();
@@ -240,36 +244,44 @@ export class WalletGeneratorEngine {
     this.generatedCount = 0;
     this.realGeneratedCount = 0;
     this.todayGenerated = 0;
+    this.addressSet.clear();
   }
   
   private async syncWithDatabase() {
     if (!this.running) return;
     
-    const batchToSave = this.getLastBatch(1000);
+    // Take a smaller batch to save to avoid overwhelming the database
+    const batchToSave = this.getLastBatch(500);
     if (batchToSave.length > 0) {
       try {
-        const uniqueWallets = batchToSave.filter(
-          (wallet, index, self) => 
-            self.findIndex(w => w.address === wallet.address) === index
-        );
+        // Filter for unique wallets not already in our tracking set
+        const uniqueWallets = batchToSave.filter(wallet => {
+          if (this.addressSet.has(wallet.address)) {
+            return false;
+          }
+          // Add to our set for future checks
+          this.addressSet.add(wallet.address);
+          return true;
+        });
         
-        await walletDB.storeWallets(uniqueWallets);
-        
-        this.savedToDbCount = walletDB.getTotalCount();
-        
-        if (this.realGeneratedCount < this.savedToDbCount) {
-          this.realGeneratedCount = this.savedToDbCount;
+        if (uniqueWallets.length > 0) {
+          console.log(`Generator: Saving ${uniqueWallets.length} unique wallets to database`);
+          
+          // Save the unique wallets to the database
+          await walletDB.storeWallets(uniqueWallets);
+          
+          // Update saved count from database
+          this.savedToDbCount = walletDB.getTotalCount();
+          
+          // Update progress if callback is set
+          if (this.onProgress) {
+            this.onProgress({
+              count: this.realGeneratedCount,
+              speed: this.generationSpeed,
+              savedCount: this.savedToDbCount
+            });
+          }
         }
-        
-        if (this.onProgress) {
-          this.onProgress({
-            count: this.realGeneratedCount,
-            speed: this.generationSpeed,
-            savedCount: this.savedToDbCount
-          });
-        }
-        
-        console.log(`Generator: Synced ${uniqueWallets.length} unique wallets. Total in DB: ${this.savedToDbCount}`);
       } catch (error) {
         console.error('Failed to sync wallets with database', error);
       }
@@ -279,6 +291,7 @@ export class WalletGeneratorEngine {
   private runGenerationCycle(): void {
     if (!this.running) return;
     
+    // Calculate batch size based on target speed, but limit it
     const batchSize = Math.min(this.config.batchSize, Math.floor(this.targetSpeed / 20));
     
     const trc20Count = Math.round(batchSize * (this.config.trc20Ratio / 100));
@@ -289,12 +302,24 @@ export class WalletGeneratorEngine {
     
     const newBatch = [...trc20Batch, ...erc20Batch];
     
-    this.wallets = [...this.wallets, ...newBatch].slice(-1000);
+    // Filter out wallets with addresses that we've already seen
+    const uniqueNewBatch = newBatch.filter(wallet => {
+      if (this.addressSet.has(wallet.address)) {
+        return false;
+      }
+      this.addressSet.add(wallet.address);
+      return true;
+    });
     
-    this.generatedCount += newBatch.length;
-    this.realGeneratedCount += newBatch.length;
-    this.todayGenerated += newBatch.length;
+    // Keep the most recent wallets for display, with a reasonable limit
+    this.wallets = [...this.wallets, ...uniqueNewBatch].slice(-1000);
     
+    // Increment counters for generated wallets
+    this.generatedCount += uniqueNewBatch.length;
+    this.realGeneratedCount += uniqueNewBatch.length;
+    this.todayGenerated += uniqueNewBatch.length;
+    
+    // Update generation speed calculation
     const now = Date.now();
     const elapsed = (now - this.lastSpeedUpdate) / 1000;
     
@@ -303,6 +328,7 @@ export class WalletGeneratorEngine {
       this.lastSample = this.generatedCount;
       this.lastSpeedUpdate = now;
       
+      // Update progress if callback is set
       if (this.onProgress) {
         this.onProgress({
           count: this.realGeneratedCount,
@@ -312,6 +338,7 @@ export class WalletGeneratorEngine {
       }
     }
     
+    // Schedule next cycle - adjust timing based on thread count
     const cycleTime = 50 / this.config.threadCount;
     setTimeout(() => this.runGenerationCycle(), cycleTime);
   }

@@ -1,3 +1,4 @@
+
 import { Wallet, WalletType, FilterOptions, DatabaseStats } from './types';
 
 class WalletDatabase {
@@ -32,35 +33,54 @@ class WalletDatabase {
   }
   
   public async storeWallets(wallets: Wallet[]): Promise<void> {
-    if (!wallets || wallets.length === 0) return;
+    if (!wallets || wallets.length === 0) {
+      console.log('Database: No wallets to store');
+      return;
+    }
     
-    // More robust duplicate detection
+    const startTime = Date.now();
+    
+    // Filter out duplicates by checking against the address set
     const uniqueWallets = wallets.filter(wallet => {
-      // Check if address already exists in the database
-      const isDuplicate = this.wallets.some(
-        existingWallet => existingWallet.address === wallet.address
-      );
-      return !isDuplicate;
+      if (this.addressSet.has(wallet.address)) {
+        return false;
+      }
+      this.addressSet.add(wallet.address);
+      return true;
     });
     
-    if (uniqueWallets.length === 0) return;
+    if (uniqueWallets.length === 0) {
+      console.log('Database: All wallets were duplicates, nothing to store');
+      return;
+    }
     
-    // Add new unique wallets
+    // Add new unique wallets to the collection
     this.wallets = [...this.wallets, ...uniqueWallets];
     this.lastWrite = new Date();
     this.todayCount += uniqueWallets.length;
     
-    // More precise write speed calculation
+    // Calculate write speed
     const now = Date.now();
     const elapsed = (now - this.lastSpeedUpdate) / 1000;
     
     if (elapsed >= 1) {
-      this.writeSpeed = Math.round(uniqueWallets.length / elapsed);
+      this.writeSpeed = Math.round((this.wallets.length - this.lastCount) / elapsed);
       this.lastSpeedUpdate = now;
       this.lastCount = this.wallets.length;
     }
     
-    console.log(`Database: Stored ${uniqueWallets.length} unique wallets. Total: ${this.wallets.length}`);
+    // Dispatch event for other components to listen to
+    if (typeof window !== 'undefined' && window.dispatchEvent) {
+      window.dispatchEvent(new CustomEvent('walletsStored', {
+        detail: {
+          count: uniqueWallets.length,
+          total: this.wallets.length,
+          time: Date.now() - startTime
+        }
+      }));
+    }
+    
+    console.log(`Database: Stored ${uniqueWallets.length} unique wallets in ${Date.now() - startTime}ms. Total: ${this.wallets.length}`);
   }
   
   public async getWallets(options: FilterOptions): Promise<Wallet[]> {
@@ -203,6 +223,8 @@ class WalletDatabase {
     if (typeof window !== 'undefined' && window.dispatchEvent) {
       window.dispatchEvent(new CustomEvent('databaseCleared'));
     }
+    
+    console.log('Database: Cleared all wallets');
     
     await new Promise(resolve => setTimeout(resolve, 100));
   }
