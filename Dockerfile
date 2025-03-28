@@ -20,7 +20,7 @@ ARG SERVER_MEMORY_MB
 ENV SERVER_CPU_CORES=${SERVER_CPU_CORES:-16}
 ENV SERVER_MEMORY_MB=${SERVER_MEMORY_MB:-32768}
 
-# 运行环境检查脚本 - 使用node执行
+# 运行环境检查脚本
 RUN node ./prebuild.js
 
 # 注入服务器信息到前端
@@ -30,6 +30,7 @@ RUN echo "window.SERVER_MEMORY_MB = '${SERVER_MEMORY_MB:-32768}';" >> ./public/s
 RUN echo "window.isWorkerSupported = typeof Worker !== 'undefined';" >> ./public/server-config.js
 RUN echo "window.isIndexedDBSupported = typeof window.indexedDB !== 'undefined';" >> ./public/server-config.js
 RUN echo "console.log('服务器配置加载完成 - CPU核心:', window.SERVER_CPU_CORES, '内存:', window.SERVER_MEMORY_MB + 'MB');" >> ./public/server-config.js
+RUN echo "document.dispatchEvent(new Event('server-config-ready'));" >> ./public/server-config.js
 
 # Build the application
 RUN npm run build
