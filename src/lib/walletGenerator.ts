@@ -1,3 +1,4 @@
+
 import { Wallet, WalletType, GeneratorConfig } from './types';
 import { walletDB } from './database';
 import * as CryptoJS from 'crypto-js';
@@ -89,23 +90,80 @@ function keccak256(hexString: string): string {
   return hash.toString(CryptoJS.enc.Hex);
 }
 
-// Generate TRC20 address from private key (simplified implementation)
+// Improved TRON address derivation that better matches wallet behavior
 function deriveTRC20Address(privateKey: string): string {
-  // In a real implementation, this would:
+  // In a real implementation:
   // 1. Derive public key from private key using secp256k1 curve
   // 2. Calculate keccak256 hash of the public key
-  // 3. Take the last 20 bytes and add TRC20 prefix
+  // 3. Take the last 20 bytes and convert to TRON format with base58
   
-  // For simulation, we'll create a deterministic address based on the private key
-  // using a simple hash function
-  const hash = sha256(privateKey);
-  const subHash = hash.substring(hash.length - 40); // Take last 40 chars
+  // For this simulation, we need a more accurate representation
+  // We'll use a deterministic but more realistic approach
   
-  // Convert to a simplified "address" with T prefix that's stable for the same private key
-  return 'T' + BASE58_CHARS.substring(0, 33).split('').map((_, i) => {
-    const charIndex = parseInt(subHash.charAt(i % subHash.length), 16) % BASE58_CHARS.length;
-    return BASE58_CHARS.charAt(charIndex);
-  }).join('');
+  // Use both SHA256 and keccak256 for a more unique hash
+  const hash = keccak256(sha256(privateKey) + privateKey);
+  const addressHex = hash.substring(hash.length - 40); // Take last 20 bytes (40 chars)
+  
+  // Add 41 prefix (TRON's network ID in hex)
+  const addressWithPrefix = "41" + addressHex;
+  
+  // Convert hex to byte array
+  const bytes = new Uint8Array(21);
+  for (let i = 0; i < addressWithPrefix.length / 2; i++) {
+    bytes[i] = parseInt(addressWithPrefix.substring(i * 2, i * 2 + 2), 16);
+  }
+  
+  // Calculate double SHA256 checksum
+  const checksum = doubleHash(bytes.slice(0, 21)).slice(0, 4);
+  
+  // Combine address bytes and checksum
+  const combined = new Uint8Array(25);
+  combined.set(bytes.slice(0, 21));
+  combined.set(checksum, 21);
+  
+  // Convert to base58
+  return base58TRONEncode(combined);
+}
+
+// Double SHA256 hash
+function doubleHash(bytes: Uint8Array): Uint8Array {
+  const firstHash = CryptoJS.SHA256(CryptoJS.lib.WordArray.create(bytes as any));
+  const secondHash = CryptoJS.SHA256(firstHash);
+  const hexStr = secondHash.toString(CryptoJS.enc.Hex);
+  
+  const result = new Uint8Array(32);
+  for (let i = 0; i < 32; i++) {
+    result[i] = parseInt(hexStr.substr(i * 2, 2), 16);
+  }
+  
+  return result;
+}
+
+// Base58 encoding specifically for TRON addresses
+function base58TRONEncode(bytes: Uint8Array): string {
+  const BASE58_CHARS = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+  let result = "";
+  let value = 0;
+  let i = 0;
+  
+  // Use BigInt for dealing with large numbers
+  let intValue = BigInt(0);
+  for (i = 0; i < bytes.length; i++) {
+    intValue = intValue * BigInt(256) + BigInt(bytes[i]);
+  }
+  
+  while (intValue > BigInt(0)) {
+    const remainder = Number(intValue % BigInt(58));
+    intValue = intValue / BigInt(58);
+    result = BASE58_CHARS[remainder] + result;
+  }
+  
+  // Leading zeros become '1'
+  for (i = 0; i < bytes.length && bytes[i] === 0; i++) {
+    result = '1' + result;
+  }
+  
+  return result;
 }
 
 // Generate ERC20 address from private key (simplified implementation)
