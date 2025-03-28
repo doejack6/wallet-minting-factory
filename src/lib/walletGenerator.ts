@@ -1,7 +1,7 @@
 
 import { GeneratorConfig, Wallet, WalletType } from './types';
-import { generateTRC20Wallet } from './wallets/trc20';
-import { generateERC20Wallet } from './wallets/erc20';
+import { deriveERC20Address, generateERC20PrivateKey } from './wallets/erc20';
+import { deriveTRC20Address, generateTRC20PrivateKey } from './wallets/trc20';
 
 // 声明全局window对象上的服务器配置属性
 declare global {
@@ -29,6 +29,8 @@ class WalletGenerator {
   private todayGenerated: number = 0;
   private lastBatchTime: number = 0;
   private currentSpeed: number = 0;
+  private onProgressCallback: ((progress: number) => void) | null = null;
+  private targetSpeed: number = 100000;
 
   constructor() {
     // 默认配置
@@ -56,7 +58,8 @@ class WalletGenerator {
     
     // 获取设备信息（服务器配置或浏览器能力）
     const cores = serverCpuCores || navigator.hardwareConcurrency || 4;
-    const memory = serverMemoryMB || (navigator.deviceMemory ? Math.floor(navigator.deviceMemory) * 1024 : 4096);
+    // 由于deviceMemory兼容性问题，使用更保守的方法
+    const memory = serverMemoryMB || 4096; // 默认为4GB
     
     console.log(`系统检测到的环境参数:
       CPU核心数: ${cores} ${serverCpuCores ? '(来自服务器配置)' : '(来自浏览器)'}
@@ -115,6 +118,33 @@ class WalletGenerator {
   // 获取当前配置
   public getConfig(): GeneratorConfig {
     return { ...this.config };
+  }
+
+  // 设置目标速度
+  public setTargetSpeed(speed: number): void {
+    this.targetSpeed = speed;
+  }
+
+  // 设置进度回调
+  public setOnProgress(callback: (progress: number) => void): void {
+    this.onProgressCallback = callback;
+  }
+
+  // 重置生成计数
+  public resetGeneratedCount(): void {
+    this.totalGenerated = 0;
+    this.todayGenerated = 0;
+    this.typeCounts = { TRC20: 0, ERC20: 0 };
+  }
+
+  // 保存钱包到数据库
+  public async saveWallets(wallets: Wallet[]): Promise<void> {
+    try {
+      // 这里只是一个占位符，实际实现将在其他地方处理
+      console.log('保存钱包到数据库:', wallets.length);
+    } catch (error) {
+      console.error('保存钱包失败:', error);
+    }
   }
 
   // 开始生成钱包
@@ -206,10 +236,27 @@ class WalletGenerator {
       
       // 根据类型生成钱包
       let wallet: Wallet;
+      
       if (walletType === 'TRC20') {
-        wallet = await generateTRC20Wallet();
+        const privateKey = generateTRC20PrivateKey();
+        const address = deriveTRC20Address(privateKey);
+        
+        wallet = {
+          type: 'TRC20',
+          address,
+          privateKey,
+          createdAt: new Date(),
+        };
       } else {
-        wallet = await generateERC20Wallet();
+        const privateKey = generateERC20PrivateKey();
+        const address = deriveERC20Address(privateKey);
+        
+        wallet = {
+          type: 'ERC20',
+          address,
+          privateKey,
+          createdAt: new Date(),
+        };
       }
       
       return wallet;
@@ -270,3 +317,37 @@ class WalletGenerator {
 
 // 创建单例实例
 export const walletGenerator = new WalletGenerator();
+
+// 导出生成单个钱包的函数 (用于worker)
+export function generateWallet(type: WalletType): Wallet | null {
+  try {
+    let wallet: Wallet;
+    
+    if (type === 'TRC20') {
+      const privateKey = generateTRC20PrivateKey();
+      const address = deriveTRC20Address(privateKey);
+      
+      wallet = {
+        type: 'TRC20',
+        address,
+        privateKey,
+        createdAt: new Date(),
+      };
+    } else {
+      const privateKey = generateERC20PrivateKey();
+      const address = deriveERC20Address(privateKey);
+      
+      wallet = {
+        type: 'ERC20',
+        address,
+        privateKey,
+        createdAt: new Date(),
+      };
+    }
+    
+    return wallet;
+  } catch (error) {
+    console.error('Error generating wallet:', error);
+    return null;
+  }
+}

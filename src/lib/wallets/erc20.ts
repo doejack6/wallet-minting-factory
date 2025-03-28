@@ -105,3 +105,16 @@ export function toChecksumAddress(address: string): string {
   
   return result;
 }
+
+// Helper function to generate a complete ERC20 wallet
+export function generateERC20Wallet(): { type: 'ERC20', address: string, privateKey: string, createdAt: Date } {
+  const privateKey = generateERC20PrivateKey();
+  const address = deriveERC20Address(privateKey);
+  
+  return {
+    type: 'ERC20',
+    address,
+    privateKey,
+    createdAt: new Date()
+  };
+}
