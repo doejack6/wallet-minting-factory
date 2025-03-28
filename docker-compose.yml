@@ -1,0 +1,13 @@
+
+version: '3.8'
+
+services:
+  wallet-factory:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    restart: always
+    volumes:
+      - ./logs:/var/log/nginx
