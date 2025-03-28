@@ -27,6 +27,8 @@ RUN node ./prebuild.js
 RUN echo "// 服务器配置信息 - 构建于 $(date)" > ./public/server-config.js
 RUN echo "window.SERVER_CPU_CORES = '${SERVER_CPU_CORES:-16}';" >> ./public/server-config.js
 RUN echo "window.SERVER_MEMORY_MB = '${SERVER_MEMORY_MB:-32768}';" >> ./public/server-config.js
+RUN echo "window.isWorkerSupported = typeof Worker !== 'undefined';" >> ./public/server-config.js
+RUN echo "window.isIndexedDBSupported = typeof window.indexedDB !== 'undefined';" >> ./public/server-config.js
 RUN echo "console.log('服务器配置加载完成 - CPU核心:', window.SERVER_CPU_CORES, '内存:', window.SERVER_MEMORY_MB + 'MB');" >> ./public/server-config.js
 
 # Build the application

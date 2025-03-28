@@ -22,3 +22,6 @@ console.log('服务器配置加载完成:', {
   是否支持Web Worker: window.isWorkerSupported,
   是否支持IndexedDB: window.isIndexedDBSupported
 });
+
+// 通知应用服务器配置已准备就绪
+document.dispatchEvent(new Event('server-config-ready'));
