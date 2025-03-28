@@ -1,68 +1,77 @@
 
-// Worker script for wallet generation
-import { generateERC20Wallet } from '../wallets/erc20';
-import { generateTRC20Wallet } from '../wallets/trc20';
 import { WalletType, Wallet } from '../types';
-import { v4 as uuidv4 } from 'uuid';
+import { generateERC20Wallet, generateTRC20Wallet } from '../wallets/erc20';
+import { generateRandomBytes } from '../crypto/random';
 
-// Make sure to define that we're in a worker context
-declare const self: Worker;
+// Increased batch size and optimized generation
+const BATCH_SIZE = 1000;
+const MAX_GENERATION_SPEED = 10000; // Wallets per second
 
-// Listen for messages from the main thread
-self.addEventListener('message', (event) => {
-  try {
-    const { type, count } = event.data;
-    
-    if (count > 0) {
-      // Batch generation
-      const wallets = generateWalletsBatch(type, count);
-      self.postMessage({ wallets });
-    } else {
-      // Single wallet generation
-      const wallet = generateWallet(type);
-      self.postMessage({ wallet });
-    }
-  } catch (error) {
-    console.error('Worker error:', error);
-    self.postMessage({ error: error.message || 'Unknown error in worker' });
+const determineWalletType = (types: WalletType[], trc20Ratio: number): WalletType => {
+  if (types.length === 1) return types[0];
+  
+  const randomValue = generateRandomBytes(1)[0] / 255 * 100;
+  return randomValue < trc20Ratio ? 'TRC20' : 'ERC20';
+};
+
+const generateWallet = (type: WalletType): Wallet => {
+  const baseWallet = type === 'TRC20' 
+    ? generateTRC20Wallet() 
+    : generateERC20Wallet();
+
+  return {
+    id: crypto.randomUUID(),
+    type,
+    address: baseWallet.address,
+    privateKey: baseWallet.privateKey,
+    publicKey: baseWallet.publicKey,
+    createdAt: new Date()
+  };
+};
+
+const calculateSpeed = (startTime: number, generatedCount: number) => {
+  const elapsedSeconds = (Date.now() - startTime) / 1000;
+  return Math.min(
+    MAX_GENERATION_SPEED, 
+    Math.floor(generatedCount / (elapsedSeconds || 1))
+  );
+};
+
+self.onmessage = (event) => {
+  const { action, data } = event.data;
+
+  switch (action) {
+    case 'start':
+      const { count, types, trc20Ratio } = data;
+      generateWallets(count, types, trc20Ratio);
+      break;
+    case 'stop':
+      // Implement graceful shutdown
+      self.close();
+      break;
   }
-});
+};
 
-// Generate a batch of wallets
-function generateWalletsBatch(type: WalletType, count: number): Wallet[] {
+const generateWallets = (count: number, types: WalletType[], trc20Ratio: number) => {
   const wallets: Wallet[] = [];
-  for (let i = 0; i < count; i++) {
-    const wallet = generateWallet(type);
-    if (wallet) wallets.push(wallet);
-  }
-  return wallets;
-}
+  const startTime = Date.now();
 
-// Generate a single wallet
-function generateWallet(type: WalletType): Wallet {
-  let wallet: Wallet;
-  
-  if (type === 'TRC20') {
-    const trc20Wallet = generateTRC20Wallet();
-    wallet = {
-      id: uuidv4(),
-      type: 'TRC20',
-      address: trc20Wallet.address,
-      privateKey: trc20Wallet.privateKey,
-      publicKey: trc20Wallet.publicKey,
-      createdAt: new Date(),
-    };
-  } else {
-    const erc20Wallet = generateERC20Wallet();
-    wallet = {
-      id: uuidv4(),
-      type: 'ERC20',
-      address: erc20Wallet.address,
-      privateKey: erc20Wallet.privateKey,
-      publicKey: erc20Wallet.publicKey,
-      createdAt: new Date(),
-    };
+  for (let i = 0; i < count; i++) {
+    const type = determineWalletType(types, trc20Ratio);
+    const wallet = generateWallet(type);
+    wallets.push(wallet);
+
+    if (wallets.length >= BATCH_SIZE || i === count - 1) {
+      self.postMessage({ 
+        action: 'wallets', 
+        data: { 
+          wallets, 
+          generatedCount: i + 1,
+          speed: calculateSpeed(startTime, i + 1),
+          isDone: i === count - 1
+        } 
+      });
+      wallets.length = 0;
+    }
   }
-  
-  return wallet;
-}
+};
