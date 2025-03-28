@@ -116,7 +116,7 @@ class WalletDatabase {
           a: wallet.address,
           p: wallet.privateKey,
           k: wallet.publicKey,
-          t: wallet.type === 'TRC20' ? 0 : 1,
+          t: wallet.type === 'TRC20' ? 0 : 1 as 0 | 1,
           c: wallet.createdAt.getTime()
         })));
       }
