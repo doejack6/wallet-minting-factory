@@ -12,7 +12,10 @@ import {
   Trash2, 
   AlertTriangle,
   BarChart4,
-  Settings2
+  Settings2,
+  FileDown,
+  FileCsv,
+  FileText
 } from 'lucide-react';
 import { walletDB } from '@/lib/database';
 import { walletGenerator } from '@/lib/walletGenerator';
@@ -21,6 +24,14 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { FilterOptions } from '@/lib/types';
+import { exportWallets } from '@/lib/exportUtils';
 
 const Database: React.FC = () => {
   const { toast } = useToast();
@@ -36,6 +47,7 @@ const Database: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [storageEfficiency, setStorageEfficiency] = useState(0);
   const [optimizationLevel, setOptimizationLevel] = useState(5); // 1-10 scale
+  const [isExporting, setIsExporting] = useState(false);
   
   useEffect(() => {
     const updateStats = () => {
@@ -105,6 +117,37 @@ const Database: React.FC = () => {
     }
   };
   
+  const handleExport = async (format: 'csv' | 'txt') => {
+    setIsExporting(true);
+    try {
+      const allWallets = await walletDB.getWallets({
+        type: 'ALL',
+        pattern: '',
+        patternType: 'ANY',
+        patternLength: 0,
+        dateFrom: null,
+        dateTo: null,
+        limit: 1000000,
+      });
+      
+      exportWallets(allWallets, format, `wallet-database-export.${format}`);
+      
+      toast({
+        title: "导出成功",
+        description: `已成功导出 ${allWallets.length} 条记录到 ${format.toUpperCase()} 文件。`,
+      });
+    } catch (error) {
+      console.error('Failed to export wallets', error);
+      toast({
+        title: "导出失败",
+        description: "导出钱包数据时出错。",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+  
   const formatTime = (date: Date | null): string => {
     if (!date) return 'Never';
     return date.toLocaleString();
@@ -119,6 +162,30 @@ const Database: React.FC = () => {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">数据库管理</h1>
         <div className="space-x-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <FileDown className="mr-2 h-4 w-4" />
+                导出数据
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem 
+                onClick={() => handleExport('csv')}
+                disabled={isExporting || dbStats.totalStored === 0}
+              >
+                <FileCsv className="mr-2 h-4 w-4" />
+                导出为CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={() => handleExport('txt')}
+                disabled={isExporting || dbStats.totalStored === 0}
+              >
+                <FileText className="mr-2 h-4 w-4" />
+                导出为TXT
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button variant="outline" onClick={handleManualSave} disabled={isLoading}>
             <Save className="mr-2 h-4 w-4" />
             手动保存

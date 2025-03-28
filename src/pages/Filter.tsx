@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,7 +18,7 @@ import {
   TableHeader, 
   TableRow 
 } from '@/components/ui/table';
-import { Filter as FilterIcon, Copy, RefreshCw, Search, Key, Hash } from 'lucide-react';
+import { Filter as FilterIcon, Copy, RefreshCw, Search, Key, Hash, FileDown, FileCsv, FileText } from 'lucide-react';
 import { FilterOptions, Wallet, WalletType, SearchPatternType } from '@/lib/types';
 import { walletDB } from '@/lib/database';
 import { useToast } from '@/components/ui/use-toast';
@@ -32,6 +31,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { exportWallets } from '@/lib/exportUtils';
 
 const Filter: React.FC = () => {
   const { toast } = useToast();
@@ -49,6 +49,7 @@ const Filter: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [totalResults, setTotalResults] = useState(0);
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   
   const fetchWallets = async () => {
     setIsLoading(true);
@@ -79,7 +80,6 @@ const Filter: React.FC = () => {
     setFilterOptions(prev => ({
       ...prev,
       patternType: value as SearchPatternType,
-      // Reset pattern length when changing type
       patternLength: value === 'END' || value === 'START' ? 4 : 0,
     }));
   };
@@ -144,14 +144,65 @@ const Filter: React.FC = () => {
     }
   };
   
+  const handleExport = (format: 'csv' | 'txt') => {
+    if (filteredWallets.length === 0) {
+      toast({
+        title: "无数据可导出",
+        description: "没有符合筛选条件的钱包记录可导出。",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsExporting(true);
+    try {
+      const filename = `filtered-wallets-${new Date().toISOString().replace(/[:.]/g, '-')}.${format}`;
+      exportWallets(filteredWallets, format, filename);
+      
+      toast({
+        title: "导出成功",
+        description: `已成功导出 ${filteredWallets.length} 条记录到 ${format.toUpperCase()} 文件。`,
+      });
+    } catch (error) {
+      console.error('Failed to export wallets', error);
+      toast({
+        title: "导出失败",
+        description: "导出钱包数据时出错。",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+  
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">筛选钱包</h1>
-        <Button variant="outline" onClick={handleClear}>
-          <RefreshCw className="mr-2 h-4 w-4" />
-          清除筛选条件
-        </Button>
+        <div className="flex space-x-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" disabled={filteredWallets.length === 0 || isExporting}>
+                <FileDown className="mr-2 h-4 w-4" />
+                导出结果
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleExport('csv')}>
+                <FileCsv className="mr-2 h-4 w-4" />
+                导出为CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExport('txt')}>
+                <FileText className="mr-2 h-4 w-4" />
+                导出为TXT
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button variant="outline" onClick={handleClear}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            清除筛选条件
+          </Button>
+        </div>
       </div>
       
       <Card>

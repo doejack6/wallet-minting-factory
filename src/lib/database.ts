@@ -163,6 +163,16 @@ class WalletDatabase {
   }
   
   public async getWallets(options: FilterOptions): Promise<Wallet[]> {
+    // For very large exports, optimize performance
+    if (options.limit > 10000) {
+      console.log(`Database: Optimizing for large data export (${options.limit} records)`);
+      
+      // If requesting all wallets with no filters, return a copy directly for better performance
+      if (options.type === 'ALL' && !options.pattern && !options.dateFrom && !options.dateTo) {
+        return [...this.wallets].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      }
+    }
+    
     // Simulate query latency
     await new Promise(resolve => setTimeout(resolve, 100));
     
