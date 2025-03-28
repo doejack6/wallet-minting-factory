@@ -15,6 +15,7 @@ export interface GeneratorConfig {
   threadCount: number; // 线程数
   batchSize: number; // 批处理大小
   memoryLimit: number; // 内存限制(MB)
+  walletTypes: WalletType[]; // 要生成的钱包类型
 }
 
 export interface GeneratorStats {

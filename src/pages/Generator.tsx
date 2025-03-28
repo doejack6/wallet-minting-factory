@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -5,7 +6,19 @@ import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { AlertTriangle, Play, Pause, Settings, RefreshCw, TrendingUp, AlertCircle, Shield } from 'lucide-react';
+import { 
+  AlertTriangle, 
+  Play, 
+  Pause, 
+  Settings, 
+  RefreshCw, 
+  TrendingUp, 
+  AlertCircle, 
+  Shield, 
+  Save,
+  Cpu,
+  Zap
+} from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { walletGenerator } from '@/lib/walletGenerator';
@@ -16,6 +29,9 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { GeneratorConfig, Wallet } from '@/lib/types';
 import { Progress } from '@/components/ui/progress';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 const Generator: React.FC = () => {
   const { toast } = useToast();
@@ -28,12 +44,14 @@ const Generator: React.FC = () => {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [activeTab, setActiveTab] = useState('trc20');
   const [storageEfficiency, setStorageEfficiency] = useState(100); // 默认为100%，因为我们现在确保了保存所有生成的钱包
+  const [isOpenPerformanceInfo, setIsOpenPerformanceInfo] = useState(false);
   
   const [config, setConfig] = useState<GeneratorConfig>({
     trc20Ratio: 50,
     threadCount: 2, // 降低默认线程数
     batchSize: 100, // 降低批处理大小
     memoryLimit: 512,
+    walletTypes: ['TRC20', 'ERC20'], // 默认生成两种类型
   });
   
   useEffect(() => {
@@ -169,7 +187,7 @@ const Generator: React.FC = () => {
     }
   };
 
-  const updateConfig = (key: keyof GeneratorConfig, value: number) => {
+  const updateConfig = (key: keyof GeneratorConfig, value: any) => {
     if (!isRunning) {
       const newConfig = { ...config, [key]: value };
       setConfig(newConfig);
@@ -181,6 +199,59 @@ const Generator: React.FC = () => {
         variant: "destructive",
       });
     }
+  };
+  
+  const toggleWalletType = (type: 'TRC20' | 'ERC20') => {
+    if (!isRunning) {
+      const walletTypes = [...config.walletTypes];
+      
+      // 如果类型已存在，则移除；否则添加
+      const index = walletTypes.indexOf(type);
+      if (index !== -1) {
+        // 确保至少有一种类型被选中
+        if (walletTypes.length > 1) {
+          walletTypes.splice(index, 1);
+        } else {
+          toast({
+            title: "至少选择一种钱包类型",
+            description: "您必须至少选择一种钱包类型。",
+            variant: "destructive",
+          });
+          return;
+        }
+      } else {
+        walletTypes.push(type);
+      }
+      
+      const newConfig = { ...config, walletTypes };
+      setConfig(newConfig);
+      walletGenerator.setConfig(newConfig);
+    }
+  };
+
+  const autoConfigureForDevice = () => {
+    if (!isRunning) {
+      const newConfig = walletGenerator.autoConfigureForDevice();
+      setConfig(newConfig);
+      toast({
+        title: "已自动配置",
+        description: `根据您的设备性能，已优化配置为线程数: ${newConfig.threadCount}, 批处理大小: ${newConfig.batchSize}, 内存限制: ${newConfig.memoryLimit}MB。`,
+      });
+    } else {
+      toast({
+        title: "无法自动配置",
+        description: "请先停止生成器，然后再执行自动配置。",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  const saveWallets = () => {
+    walletGenerator.saveWallets();
+    toast({
+      title: "钱包已保存",
+      description: "所有生成的钱包已手动保存到数据库。",
+    });
   };
 
   const getFilteredWallets = (type: 'TRC20' | 'ERC20') => {
@@ -203,24 +274,24 @@ const Generator: React.FC = () => {
     return "bg-green-200";
   };
 
-  const getOptimalSaveFrequency = () => {
-    // Calculate optimal save frequency based on target speed
-    if (targetSpeed > 500000) return 50; // Very high speed
-    if (targetSpeed > 200000) return 100; // High speed
-    if (targetSpeed > 50000) return 200; // Medium speed
-    return 500; // Low speed
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">钱包生成器</h1>
-        <Button 
-          onClick={toggleGenerator}
-          className={isRunning ? "bg-red-500 hover:bg-red-600" : "bg-green-500 hover:bg-green-600"}
-        >
-          {isRunning ? <><Pause className="mr-2 h-4 w-4" /> 停止生成器</> : <><Play className="mr-2 h-4 w-4" /> 启动生成器</>}
-        </Button>
+        <div className="flex space-x-2">
+          <Button 
+            onClick={saveWallets}
+            variant="outline"
+          >
+            <Save className="mr-2 h-4 w-4" /> 保存钱包
+          </Button>
+          <Button 
+            onClick={toggleGenerator}
+            className={isRunning ? "bg-red-500 hover:bg-red-600" : "bg-green-500 hover:bg-green-600"}
+          >
+            {isRunning ? <><Pause className="mr-2 h-4 w-4" /> 停止生成器</> : <><Play className="mr-2 h-4 w-4" /> 启动生成器</>}
+          </Button>
+        </div>
       </div>
       
       <Alert>
@@ -245,6 +316,7 @@ const Generator: React.FC = () => {
                 <h3 className="text-sm font-medium">生成速度</h3>
                 <span className="text-sm font-medium">{formatNumber(targetSpeed)} 钱包/秒</span>
               </div>
+              
               <Slider 
                 value={[targetSpeed]} 
                 min={1000} 
@@ -253,11 +325,20 @@ const Generator: React.FC = () => {
                 onValueChange={handleSpeedChange}
                 disabled={isRunning}
               />
+              
               <div className="flex justify-between text-xs text-muted-foreground">
                 <span>1,000/秒</span>
                 <span>100,000/秒</span>
                 <span>500,000/秒</span>
               </div>
+              
+              <Alert variant="destructive" className="bg-amber-50 text-amber-700 border-amber-200">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>关于生成速度</AlertTitle>
+                <AlertDescription>
+                  这里设置的是<strong>目标</strong>生成速度，实际生成速度受硬件性能和系统资源限制。较高的目标速度可能无法完全达到，但系统会尽可能接近这个目标值。
+                </AlertDescription>
+              </Alert>
             </div>
             
             <div className="grid grid-cols-2 gap-4">
@@ -326,6 +407,30 @@ const Generator: React.FC = () => {
                   </SheetHeader>
                   <div className="py-4 space-y-6">
                     <div className="space-y-4">
+                      <h3 className="text-sm font-semibold">要生成的钱包类型</h3>
+                      <div className="space-y-2 border p-4 rounded-md">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox 
+                            id="trc20-checkbox" 
+                            checked={config.walletTypes.includes('TRC20')}
+                            onCheckedChange={() => toggleWalletType('TRC20')}
+                            disabled={isRunning}
+                          />
+                          <Label htmlFor="trc20-checkbox">TRC20 钱包</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox 
+                            id="erc20-checkbox" 
+                            checked={config.walletTypes.includes('ERC20')}
+                            onCheckedChange={() => toggleWalletType('ERC20')}
+                            disabled={isRunning}
+                          />
+                          <Label htmlFor="erc20-checkbox">ERC20 钱包</Label>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-4">
                       <h3 className="text-sm font-semibold">生成比例</h3>
                       <div className="space-y-2">
                         <Label htmlFor="trc20-ratio">TRC20 比例: {config.trc20Ratio}%</Label>
@@ -335,7 +440,7 @@ const Generator: React.FC = () => {
                           min={0} 
                           max={100} 
                           step={5}
-                          disabled={isRunning}
+                          disabled={isRunning || !config.walletTypes.includes('TRC20') || !config.walletTypes.includes('ERC20')}
                           onValueChange={(value) => updateConfig('trc20Ratio', value[0])}
                         />
                       </div>
@@ -353,7 +458,55 @@ const Generator: React.FC = () => {
                     </div>
                     
                     <div className="space-y-4">
-                      <h3 className="text-sm font-semibold">性能设置</h3>
+                      <div className="flex justify-between items-center">
+                        <h3 className="text-sm font-semibold">性能设置</h3>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={autoConfigureForDevice}
+                                disabled={isRunning}
+                              >
+                                <Zap className="h-4 w-4 mr-1" />
+                                自动配置
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>根据您的设备性能自动优化设置</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                      
+                      <Collapsible
+                        open={isOpenPerformanceInfo}
+                        onOpenChange={setIsOpenPerformanceInfo}
+                        className="space-y-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-sm text-muted-foreground">系统信息</h4>
+                          <CollapsibleTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              {isOpenPerformanceInfo ? "隐藏详情" : "显示详情"}
+                            </Button>
+                          </CollapsibleTrigger>
+                        </div>
+                        <CollapsibleContent className="p-2 bg-muted rounded-md text-xs">
+                          <div className="flex items-center mb-2">
+                            <Cpu className="h-3 w-3 mr-1" />
+                            <span>CPU核心: {navigator.hardwareConcurrency || "未知"}</span>
+                          </div>
+                          <p>根据您的设备性能，建议的设置为:</p>
+                          <ul className="list-disc pl-4 mt-1 space-y-1">
+                            <li>线程数: {Math.max(2, Math.min(4, navigator.hardwareConcurrency / 2 || 2))}</li>
+                            <li>批处理大小: {navigator.hardwareConcurrency >= 8 ? "200" : "100"}</li>
+                            <li>内存限制: {navigator.hardwareConcurrency >= 8 ? "2048MB" : "1024MB"}</li>
+                          </ul>
+                        </CollapsibleContent>
+                      </Collapsible>
+
                       <div className="space-y-4">
                         <div className="grid grid-cols-3 items-center gap-2">
                           <Label htmlFor="thread-count">线程数</Label>
@@ -403,7 +556,7 @@ const Generator: React.FC = () => {
                       <div className="p-4 bg-muted rounded-lg text-xs text-muted-foreground space-y-2 mt-2">
                         <p>• 增加线程数可提高生成速度，但会增加CPU使用率</p>
                         <p>• 增大批处理大小可提高效率，但会增加内存使用</p>
-                        <p>• 内存限制决定了程序可��用的最大内存</p>
+                        <p>• 内存限制决定了程序可使用的最大内存</p>
                       </div>
                     </div>
                   </div>

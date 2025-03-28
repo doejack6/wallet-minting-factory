@@ -66,6 +66,7 @@ export class WalletGeneratorEngine {
     threadCount: 2, // 线程数降低到2
     batchSize: 100, // 批处理大小降低到100，确保每个批次都能快速保存
     memoryLimit: 512, // MB
+    walletTypes: ['TRC20', 'ERC20'], // 默认生成两种类型
   };
   
   constructor() {
@@ -129,6 +130,41 @@ export class WalletGeneratorEngine {
   
   public incrementSavedCount(count: number): void {
     this.savedToDbCount += count;
+  }
+  
+  // 新增方法：自动配置根据设备性能优化
+  public autoConfigureForDevice(): GeneratorConfig {
+    const newConfig = { ...this.config };
+    
+    // 检测设备性能并配置
+    // 这里是一个简单的逻辑，实际上可以根据更多性能指标调整
+    
+    const cores = navigator.hardwareConcurrency || 4;
+    
+    // 根据CPU核心数设置线程
+    if (cores >= 16) {
+      newConfig.threadCount = 8;
+      newConfig.batchSize = 500;
+      newConfig.memoryLimit = 4096;
+    } else if (cores >= 8) {
+      newConfig.threadCount = 4;
+      newConfig.batchSize = 200;
+      newConfig.memoryLimit = 2048;
+    } else if (cores >= 4) {
+      newConfig.threadCount = 2;
+      newConfig.batchSize = 100;
+      newConfig.memoryLimit = 1024;
+    } else {
+      newConfig.threadCount = 1;
+      newConfig.batchSize = 50;
+      newConfig.memoryLimit = 512;
+    }
+    
+    console.log(`自动配置: 检测到 ${cores} 核心CPU, 设置线程数: ${newConfig.threadCount}, 批处理: ${newConfig.batchSize}, 内存限制: ${newConfig.memoryLimit}MB`);
+    
+    // 应用新配置
+    this.setConfig(newConfig);
+    return newConfig;
   }
   
   public setConfig(config: Partial<GeneratorConfig>): void {
@@ -247,6 +283,11 @@ export class WalletGeneratorEngine {
     this.pendingWallets = [];
   }
   
+  public saveWallets(): void {
+    // 手动保存当前所有待保存的钱包
+    this.savePendingWallets(true);
+  }
+  
   private async savePendingWallets(force: boolean = false) {
     if (this.pendingWallets.length === 0) return;
     
@@ -303,14 +344,36 @@ export class WalletGeneratorEngine {
       
       // 根据配置的比例计算两种钱包的数量
       const batchSize = Math.min(this.config.batchSize, 100); // 限制批处理大小，确保能高效保存
-      const trc20Count = Math.round(batchSize * (this.config.trc20Ratio / 100));
-      const erc20Count = batchSize - trc20Count;
+      let newBatch: Wallet[] = [];
       
-      // 生成钱包
-      const trc20Batch = generateWalletBatch(trc20Count, 'TRC20');
-      const erc20Batch = generateWalletBatch(erc20Count, 'ERC20');
-      
-      const newBatch = [...trc20Batch, ...erc20Batch];
+      // 检查要生成哪些类型的钱包
+      if (this.config.walletTypes.includes('TRC20') && this.config.walletTypes.includes('ERC20')) {
+        // 生成两种类型
+        const trc20Count = Math.round(batchSize * (this.config.trc20Ratio / 100));
+        const erc20Count = batchSize - trc20Count;
+        
+        // 生成钱包
+        const trc20Batch = generateWalletBatch(trc20Count, 'TRC20');
+        const erc20Batch = generateWalletBatch(erc20Count, 'ERC20');
+        
+        newBatch = [...trc20Batch, ...erc20Batch];
+      } else if (this.config.walletTypes.includes('TRC20')) {
+        // 只生成TRC20
+        newBatch = generateWalletBatch(batchSize, 'TRC20');
+      } else if (this.config.walletTypes.includes('ERC20')) {
+        // 只生成ERC20
+        newBatch = generateWalletBatch(batchSize, 'ERC20');
+      } else {
+        // 如果没有选择类型，默认使用比率生成两种类型
+        const trc20Count = Math.round(batchSize * (this.config.trc20Ratio / 100));
+        const erc20Count = batchSize - trc20Count;
+        
+        // 生成钱包
+        const trc20Batch = generateWalletBatch(trc20Count, 'TRC20');
+        const erc20Batch = generateWalletBatch(erc20Count, 'ERC20');
+        
+        newBatch = [...trc20Batch, ...erc20Batch];
+      }
       
       // 增加生成计数器
       this.generatedCount += newBatch.length;
