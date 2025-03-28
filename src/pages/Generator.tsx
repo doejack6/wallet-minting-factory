@@ -34,6 +34,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import GeneratorDialog from '@/components/wallets/GeneratorDialog';
 import { backgroundGenerator, BackgroundGenState } from '@/lib/services/backgroundGeneratorService';
+import ServerConfigPanel from '@/components/generator/ServerConfigPanel';
 
 const Generator: React.FC = () => {
   const { toast } = useToast();
@@ -520,32 +521,11 @@ const Generator: React.FC = () => {
                         </TooltipProvider>
                       </div>
                       
-                      <Collapsible
-                        open={isOpenPerformanceInfo}
-                        onOpenChange={setIsOpenPerformanceInfo}
-                        className="space-y-2"
-                      >
-                        <div className="flex items-center justify-between">
-                          <h4 className="text-sm text-muted-foreground">系统信息</h4>
-                          <CollapsibleTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              {isOpenPerformanceInfo ? "隐藏详情" : "显示详情"}
-                            </Button>
-                          </CollapsibleTrigger>
-                        </div>
-                        <CollapsibleContent className="p-2 bg-muted rounded-md text-xs">
-                          <div className="flex items-center mb-2">
-                            <Cpu className="h-3 w-3 mr-1" />
-                            <span>CPU核心: {navigator.hardwareConcurrency || "未知"}</span>
-                          </div>
-                          <p>根据您的设备性能，建议的设置为:</p>
-                          <ul className="list-disc pl-4 mt-1 space-y-1">
-                            <li>线程数: {Math.max(2, Math.min(4, navigator.hardwareConcurrency / 2 || 2))}</li>
-                            <li>批处理大小: {navigator.hardwareConcurrency >= 8 ? "200" : "100"}</li>
-                            <li>内存限制: {navigator.hardwareConcurrency >= 8 ? "2048MB" : "1024MB"}</li>
-                          </ul>
-                        </CollapsibleContent>
-                      </Collapsible>
+                      <ServerConfigPanel 
+                        config={config}
+                        setConfig={setConfig}
+                        isRunning={isRunning}
+                      />
 
                       <div className="space-y-4">
                         <div className="grid grid-cols-3 items-center gap-2">
@@ -586,7 +566,7 @@ const Generator: React.FC = () => {
                             onChange={(e) => updateConfig('memoryLimit', Math.max(128, Number(e.target.value)))}
                             className="col-span-2"
                             min={128}
-                            max={4096}
+                            max={131072}
                             step={128}
                             disabled={isRunning}
                           />

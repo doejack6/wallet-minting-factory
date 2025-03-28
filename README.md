@@ -34,7 +34,22 @@ docker-compose up -d --build
 
 可以通过 `.env` 文件或在 `docker-compose` 命令中设置以下环境变量：
 ```
-VITE_API_URL=/api  # API 服务器地址
+VITE_API_URL=/api           # API 服务器地址
+SERVER_CPU_CORES=16         # 服务器CPU核心数
+SERVER_MEMORY_MB=32768      # 服务器内存 (MB)
+```
+
+#### 高性能服务器配置
+如果您在高性能服务器上运行，可以使用以下命令指定服务器资源：
+
+```bash
+SERVER_CPU_CORES=16 SERVER_MEMORY_MB=32768 docker-compose up -d --build
+```
+
+或创建 `.env` 文件：
+```
+SERVER_CPU_CORES=16
+SERVER_MEMORY_MB=32768
 ```
 
 ### Docker 命令
@@ -58,6 +73,7 @@ VITE_API_URL=/api  # API 服务器地址
 - IndexedDB 数据自动持久化到 Docker 卷
 - 多阶段构建减小镜像体积
 - 使用轻量级 Alpine Linux 镜像
+- 支持手动配置服务器资源以优化性能
 
 ### 扩展配置
 

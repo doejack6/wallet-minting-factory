@@ -1,4 +1,3 @@
-
 import { Wallet, WalletType, GeneratorConfig } from './types';
 import { walletDB } from './database';
 import { generateTRC20PrivateKey, deriveTRC20Address, derivePublicKeyFromPrivate as deriveTRC20PublicKey } from './wallets/trc20';
@@ -199,27 +198,31 @@ export class WalletGeneratorEngine {
     const newConfig = { ...this.config };
     
     // 检测设备性能并配置
-    // 这里是一个简单的逻辑，实际上可以根据更多性能指标调整
+    // 更新配置以支持高端服务器
     
     const cores = navigator.hardwareConcurrency || 4;
     
     // 根据CPU核心数设置线程
-    if (cores >= 16) {
+    if (cores >= 32) {
+      newConfig.threadCount = 12;
+      newConfig.batchSize = 1000;
+      newConfig.memoryLimit = 16384; // 16GB
+    } else if (cores >= 16) {
       newConfig.threadCount = 8;
-      newConfig.batchSize = 500;
-      newConfig.memoryLimit = 4096;
+      newConfig.batchSize = 800;
+      newConfig.memoryLimit = 8192; // 8GB
     } else if (cores >= 8) {
       newConfig.threadCount = 4;
-      newConfig.batchSize = 200;
-      newConfig.memoryLimit = 2048;
+      newConfig.batchSize = 500;
+      newConfig.memoryLimit = 4096; // 4GB
     } else if (cores >= 4) {
       newConfig.threadCount = 2;
-      newConfig.batchSize = 100;
-      newConfig.memoryLimit = 1024;
+      newConfig.batchSize = 200;
+      newConfig.memoryLimit = 2048; // 2GB
     } else {
       newConfig.threadCount = 1;
-      newConfig.batchSize = 50;
-      newConfig.memoryLimit = 512;
+      newConfig.batchSize = 100;
+      newConfig.memoryLimit = 1024; // 1GB
     }
     
     console.log(`自动配置: 检测到 ${cores} 核心CPU, 设置线程数: ${newConfig.threadCount}, 批处理: ${newConfig.batchSize}, 内存限制: ${newConfig.memoryLimit}MB`);
