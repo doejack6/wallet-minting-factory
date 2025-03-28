@@ -54,3 +54,8 @@ export function doubleHashBytes(bytes: Uint8Array): Uint8Array {
   
   return hexToBytes(hexStr);
 }
+
+// 优化哈希计算的批处理方法
+export function batchHash(inputs: string[], hashFunction: (input: string) => string): string[] {
+  return inputs.map(hashFunction);
+}

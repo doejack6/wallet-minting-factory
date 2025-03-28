@@ -9,6 +9,9 @@ class WalletDatabase {
   private todayCount = 0;
   private addressSet: Set<string> = new Set(); // For fast duplicate checking
   private processingBatch = false; // Flag to prevent concurrent processing
+  private writeQueue: Wallet[][] = []; // 队列存储待写入的批次
+  private isProcessingQueue = false; // 标记是否正在处理队列
+  private maxQueueSize = 10; // 最大队列长度
   
   constructor() {
     // Initialize database
@@ -26,37 +29,59 @@ class WalletDatabase {
       // Set up daily reset
       setInterval(() => this.resetDailyCount(), 24 * 60 * 60 * 1000);
     }, timeToMidnight);
+    
+    // 设置定期处理队列的机制
+    setInterval(() => this.processQueue(), 100);
   }
   
   private resetDailyCount(): void {
     this.todayCount = 0;
   }
   
-  public async storeWallets(wallets: Wallet[]): Promise<void> {
+  // 处理写入队列
+  private async processQueue(): Promise<void> {
+    if (this.isProcessingQueue || this.writeQueue.length === 0) {
+      return;
+    }
+    
+    this.isProcessingQueue = true;
+    
+    try {
+      // 取出队列中的第一批钱包
+      const batch = this.writeQueue.shift();
+      if (batch && batch.length > 0) {
+        // 实际处理这批钱包
+        await this.processBatch(batch);
+      }
+    } catch (error) {
+      console.error('Error processing wallet queue:', error);
+    } finally {
+      this.isProcessingQueue = false;
+      
+      // 如果队列中还有数据，继续处理
+      if (this.writeQueue.length > 0) {
+        setTimeout(() => this.processQueue(), 10);
+      }
+    }
+  }
+  
+  private async processBatch(wallets: Wallet[]): Promise<void> {
     if (!wallets || wallets.length === 0) {
-      console.log('Database: No wallets to store');
       return;
     }
     
-    if (this.processingBatch) {
-      console.log('Database: Already processing a batch, skipping');
-      return;
-    }
-    
-    this.processingBatch = true;
     const startTime = Date.now();
     
     try {
-      // Process wallets in smaller chunks to avoid blocking the main thread
-      // Increased chunk size for better efficiency
-      const chunkSize = 2000; // Increased from 1000 to 2000
+      // 处理钱包逻辑
+      const chunkSize = 1000; // 降低单次处理量
       const totalWallets = wallets.length;
       let uniqueWalletsCount = 0;
       
       for (let i = 0; i < totalWallets; i += chunkSize) {
         const chunk = wallets.slice(i, i + chunkSize);
         
-        // Use a more efficient approach to filter duplicates
+        // 使用更高效的方式过滤重复钱包
         const uniqueWalletsInChunk: Wallet[] = [];
         
         for (const wallet of chunk) {
@@ -68,12 +93,12 @@ class WalletDatabase {
         
         uniqueWalletsCount += uniqueWalletsInChunk.length;
         
-        // Add unique wallets to the collection - more efficient append
+        // 添加唯一的钱包
         if (uniqueWalletsInChunk.length > 0) {
           this.wallets.push(...uniqueWalletsInChunk);
         }
         
-        // Allow UI to update between chunks by yielding to event loop
+        // 让UI更新
         if (i + chunkSize < totalWallets) {
           await new Promise(resolve => setTimeout(resolve, 0));
         }
@@ -81,24 +106,23 @@ class WalletDatabase {
       
       if (uniqueWalletsCount === 0) {
         console.log('Database: All wallets were duplicates, nothing to store');
-        this.processingBatch = false;
         return;
       }
       
       this.lastWrite = new Date();
       this.todayCount += uniqueWalletsCount;
       
-      // Calculate write speed
+      // 计算写入速度
       const now = Date.now();
       const elapsed = (now - this.lastSpeedUpdate) / 1000;
       
-      if (elapsed >= 0.2) { // Reduced from 0.5 to 0.2 seconds for more frequent updates
+      if (elapsed >= 0.2) { // 更频繁地更新写入速度
         this.writeSpeed = Math.round((this.wallets.length - this.lastCount) / elapsed);
         this.lastSpeedUpdate = now;
         this.lastCount = this.wallets.length;
       }
       
-      // Dispatch event for other components to listen to
+      // 发送事件通知其他组件
       if (typeof window !== 'undefined' && window.dispatchEvent) {
         window.dispatchEvent(new CustomEvent('walletsStored', {
           detail: {
@@ -110,10 +134,51 @@ class WalletDatabase {
       }
       
       console.log(`Database: Stored ${uniqueWalletsCount} unique wallets in ${Date.now() - startTime}ms. Total: ${this.wallets.length}`);
-    } finally {
-      // Ensure we always clear the processing flag
-      this.processingBatch = false;
+    } catch (error) {
+      console.error('Error processing wallet batch:', error);
+      throw error; // 重新抛出错误以便上层处理
     }
+  }
+  
+  // 将钱包添加到队列
+  private queueWallets(wallets: Wallet[]): void {
+    // 如果队列过长，移除最早的批次
+    if (this.writeQueue.length >= this.maxQueueSize) {
+      console.warn(`Database: Queue overflow, dropping oldest batch of wallets`);
+      this.writeQueue.shift();
+    }
+    
+    // 添加新批次到队列
+    this.writeQueue.push([...wallets]);
+    
+    // 尝试处理队列
+    if (!this.isProcessingQueue) {
+      this.processQueue();
+    }
+  }
+  
+  public async storeWallets(wallets: Wallet[]): Promise<void> {
+    if (!wallets || wallets.length === 0) {
+      console.log('Database: No wallets to store');
+      return;
+    }
+    
+    // 优化：将大批量钱包分割成较小的批次
+    const batchSize = 2000; // 每批处理的钱包数量
+    
+    if (wallets.length > batchSize) {
+      console.log(`Database: Large batch detected (${wallets.length} wallets), splitting into smaller batches`);
+      
+      for (let i = 0; i < wallets.length; i += batchSize) {
+        const batch = wallets.slice(i, Math.min(i + batchSize, wallets.length));
+        this.queueWallets(batch);
+      }
+    } else {
+      // 钱包数量较少，直接添加到队列
+      this.queueWallets(wallets);
+    }
+    
+    return Promise.resolve(); // 异步返回，实际写入由队列处理
   }
   
   public async getWallets(options: FilterOptions): Promise<Wallet[]> {
@@ -251,6 +316,7 @@ class WalletDatabase {
     this.wallets = [];
     this.addressSet.clear(); // Clear the set too
     this.lastWrite = new Date();
+    this.writeQueue = []; // 清空写入队列
     
     // Notify that database was cleared using event system
     if (typeof window !== 'undefined' && window.dispatchEvent) {
