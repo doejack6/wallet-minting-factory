@@ -14,7 +14,7 @@ const NotFound: React.FC = () => {
           您要查找的页面可能已被移除、更名或暂时不可用。
         </p>
         <Button asChild className="mt-4">
-          <Link to="/">
+          <Link to="/analytics">
             <Home className="mr-2 h-4 w-4" />
             返回仪表盘
           </Link>
