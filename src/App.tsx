@@ -9,6 +9,9 @@ import NotFound from "./pages/NotFound";
 import Analytics from "./pages/Analytics";
 import Activity from "./pages/Activity";
 import Settings from "./pages/Settings";
+import Generator from "./pages/Generator";
+import Filter from "./pages/Filter";
+import Database from "./pages/Database";
 
 const queryClient = new QueryClient();
 
@@ -25,6 +28,30 @@ const App = () => (
             element={
               <AppLayout>
                 <Analytics />
+              </AppLayout>
+            } 
+          />
+          <Route 
+            path="/generator" 
+            element={
+              <AppLayout>
+                <Generator />
+              </AppLayout>
+            } 
+          />
+          <Route 
+            path="/filter" 
+            element={
+              <AppLayout>
+                <Filter />
+              </AppLayout>
+            } 
+          />
+          <Route 
+            path="/database" 
+            element={
+              <AppLayout>
+                <Database />
               </AppLayout>
             } 
           />

@@ -15,7 +15,10 @@ import {
 import { 
   BarChart, 
   Activity, 
-  Settings 
+  Settings,
+  Wallet,
+  Filter,
+  Database
 } from 'lucide-react';
 
 const AppSidebar = () => {
@@ -23,6 +26,9 @@ const AppSidebar = () => {
   
   const navigation = [
     { name: '分析', href: '/analytics', icon: BarChart },
+    { name: '生成器', href: '/generator', icon: Wallet },
+    { name: '筛选', href: '/filter', icon: Filter },
+    { name: '数据库', href: '/database', icon: Database },
     { name: '活动', href: '/activity', icon: Activity },
     { name: '设置', href: '/settings', icon: Settings },
   ];
