@@ -1,7 +1,7 @@
-
 import { Wallet, WalletType, FilterOptions, DatabaseStats, CompactWallet } from './types';
 
 class WalletDatabase {
+  private db: IDBDatabase | null = null;
   private wallets: CompactWallet[] = [];
   private lastWrite: Date | null = null;
   private writeSpeed = 0;
@@ -19,6 +19,7 @@ class WalletDatabase {
     // Initialize database
     console.log('Initializing wallet database with compression optimization...');
     this.resetDailyCount();
+    this.initDatabase();
     
     // Reset today's count at midnight
     const now = new Date();
@@ -34,6 +35,50 @@ class WalletDatabase {
     
     // 设置定期处理队列的机制 - 更频繁地处理，确保即时保存
     setInterval(() => this.processQueue(), 50);
+  }
+
+  private async initDatabase(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open('WalletDatabase', 1);
+
+      request.onupgradeneeded = (event) => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains('wallets')) {
+          db.createObjectStore('wallets', { keyPath: 'a' });
+        }
+      };
+
+      request.onsuccess = async (event) => {
+        this.db = request.result;
+        await this.loadWalletsFromIndexedDB();
+        resolve();
+      };
+
+      request.onerror = (event) => {
+        console.error('IndexedDB initialization error', event);
+        reject(event);
+      };
+    });
+  }
+
+  private async loadWalletsFromIndexedDB(): Promise<void> {
+    if (!this.db) return;
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction(['wallets'], 'readonly');
+      const store = transaction.objectStore('wallets');
+      const request = store.getAll();
+
+      request.onsuccess = (event) => {
+        this.wallets = request.result || [];
+        resolve();
+      };
+
+      request.onerror = (event) => {
+        console.error('Failed to load wallets from IndexedDB', event);
+        reject(event);
+      };
+    });
   }
   
   // Utility functions for conversion between Wallet and CompactWallet
@@ -151,6 +196,17 @@ class WalletDatabase {
             time: Date.now() - startTime
           }
         }));
+      }
+      
+      // 持久化到 IndexedDB
+      if (this.db) {
+        const transaction = this.db.transaction(['wallets'], 'readwrite');
+        const store = transaction.objectStore('wallets');
+        
+        wallets.forEach(wallet => {
+          const compactWallet = this.compactifyWallet(wallet);
+          store.put(compactWallet);
+        });
       }
       
       console.log(`Database: Stored ${wallets.length} wallets in ${Date.now() - startTime}ms. Total: ${this.wallets.length}`);
@@ -409,6 +465,13 @@ class WalletDatabase {
     this.addressSet.clear(); // Clear the set too
     this.lastWrite = new Date();
     this.writeQueue = []; // 清空写入队列
+    
+    // 清空 IndexedDB
+    if (this.db) {
+      const transaction = this.db.transaction(['wallets'], 'readwrite');
+      const store = transaction.objectStore('wallets');
+      store.clear();
+    }
     
     // Notify that database was cleared using event system
     if (typeof window !== 'undefined' && window.dispatchEvent) {
