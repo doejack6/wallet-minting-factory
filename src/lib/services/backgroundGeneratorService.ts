@@ -12,6 +12,7 @@ export interface BackgroundGenState {
   progress: number;
   lastUpdate: Date | null;
   error: string | null;
+  savedCount: number; // Add tracking for saved wallets
 }
 
 class BackgroundGeneratorService {
@@ -22,6 +23,7 @@ class BackgroundGeneratorService {
   private statusInterval: number | null = null;
   private initRetryCount = 0;
   private maxRetries = 3;
+  private saveInProgress = false; // Flag to prevent concurrent saves
   
   private state: BackgroundGenState = {
     isRunning: false,
@@ -31,7 +33,8 @@ class BackgroundGeneratorService {
     speed: 0,
     progress: 0,
     lastUpdate: null,
-    error: null
+    error: null,
+    savedCount: 0 // Track how many are actually saved
   };
   
   private stateListeners: Set<(state: BackgroundGenState) => void> = new Set();
@@ -64,10 +67,13 @@ class BackgroundGeneratorService {
       this.worker.addEventListener('message', this.handleWorkerMessage);
       this.worker.addEventListener('error', this.handleWorkerError);
       
-      // Set up periodic saving of pending wallets
+      // Signal worker is ready
+      this.isWorkerReady = true;
+      
+      // Set up more frequent saving of pending wallets
       this.saveInterval = window.setInterval(() => {
         this.savePendingWallets();
-      }, 200);
+      }, 100); // More frequent saves
       
       // Set up periodic status updates
       this.statusInterval = window.setInterval(() => {
@@ -77,6 +83,11 @@ class BackgroundGeneratorService {
       }, 1000);
       
       console.log('Worker initialized successfully');
+      
+      // Send ready message to notify listeners
+      this.updateState({
+        error: null
+      });
       
     } catch (error) {
       console.error('Failed to initialize wallet generator worker:', error);
@@ -129,8 +140,12 @@ class BackgroundGeneratorService {
         break;
       
       case 'wallets':
+        console.log(`Received ${data.wallets?.length || 0} wallets from worker`);
         // Add new wallets to pending list
-        this.pendingWallets.push(...data.wallets);
+        if (data.wallets && Array.isArray(data.wallets)) {
+          this.pendingWallets.push(...data.wallets);
+          console.log(`Added to pending wallets. Total pending: ${this.pendingWallets.length}`);
+        }
         
         // Update state
         this.updateState({
@@ -188,13 +203,24 @@ class BackgroundGeneratorService {
   };
   
   private async savePendingWallets() {
-    if (this.pendingWallets.length === 0) return;
+    if (this.pendingWallets.length === 0 || this.saveInProgress) return;
     
+    this.saveInProgress = true;
     const walletsToSave = [...this.pendingWallets];
     this.pendingWallets = [];
     
+    console.log(`Attempting to save ${walletsToSave.length} wallets to database`);
+    
     try {
       await walletDB.storeWallets(walletsToSave);
+      
+      // Update the saved count
+      this.updateState({
+        savedCount: this.state.savedCount + walletsToSave.length,
+        error: null
+      });
+      
+      console.log(`Successfully saved ${walletsToSave.length} wallets to database. Total saved: ${this.state.savedCount}`);
     } catch (error) {
       console.error('Failed to save pending wallets:', error);
       // Put the wallets back in the queue
@@ -203,6 +229,13 @@ class BackgroundGeneratorService {
       this.updateState({
         error: `保存钱包数据失败: ${error instanceof Error ? error.message : String(error)}`
       });
+    } finally {
+      this.saveInProgress = false;
+      
+      // If there are still pending wallets, schedule another save
+      if (this.pendingWallets.length > 0) {
+        setTimeout(() => this.savePendingWallets(), 100);
+      }
     }
   }
   
@@ -241,10 +274,12 @@ class BackgroundGeneratorService {
       return;
     }
     
+    // Reset the state for new generation
     this.updateState({
       isRunning: true,
       targetCount: count,
       generatedCount: 0,
+      savedCount: 0,
       startTime: new Date(),
       speed: 0,
       progress: 0,
@@ -269,6 +304,9 @@ class BackgroundGeneratorService {
     }
     
     this.worker.postMessage({ action: 'stop' });
+    
+    // Save any remaining wallets
+    this.savePendingWallets();
   }
   
   public subscribeTo(listener: (state: BackgroundGenState) => void): () => void {

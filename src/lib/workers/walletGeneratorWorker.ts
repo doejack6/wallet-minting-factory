@@ -1,6 +1,7 @@
 
 import { WalletType, Wallet } from '../types';
-import { generateERC20Wallet, generateTRC20Wallet } from '../wallets/erc20';
+import { generateERC20Wallet } from '../wallets/erc20';
+import { generateTRC20Wallet } from '../wallets/trc20';
 import { generateRandomBytes } from '../crypto/random';
 
 // Increased batch size and optimized generation
@@ -47,7 +48,18 @@ self.onmessage = (event) => {
       break;
     case 'stop':
       // Implement graceful shutdown
-      self.close();
+      self.postMessage({ action: 'stopped' });
+      break;
+    case 'status':
+      // Worker will respond to status requests
+      self.postMessage({ 
+        action: 'status', 
+        data: { 
+          // Return current status if available
+          generatedCount: 0,
+          progress: 0
+        } 
+      });
       break;
   }
 };
@@ -55,23 +67,33 @@ self.onmessage = (event) => {
 const generateWallets = (count: number, types: WalletType[], trc20Ratio: number) => {
   const wallets: Wallet[] = [];
   const startTime = Date.now();
+  let generatedCount = 0;
 
-  for (let i = 0; i < count; i++) {
-    const type = determineWalletType(types, trc20Ratio);
-    const wallet = generateWallet(type);
-    wallets.push(wallet);
+  try {
+    for (let i = 0; i < count; i++) {
+      const type = determineWalletType(types, trc20Ratio);
+      const wallet = generateWallet(type);
+      wallets.push(wallet);
+      generatedCount++;
 
-    if (wallets.length >= BATCH_SIZE || i === count - 1) {
-      self.postMessage({ 
-        action: 'wallets', 
-        data: { 
-          wallets, 
-          generatedCount: i + 1,
-          speed: calculateSpeed(startTime, i + 1),
-          isDone: i === count - 1
-        } 
-      });
-      wallets.length = 0;
+      if (wallets.length >= BATCH_SIZE || i === count - 1) {
+        self.postMessage({ 
+          action: 'wallets', 
+          data: { 
+            wallets: [...wallets], // Send a copy to avoid reference issues
+            generatedCount: generatedCount,
+            speed: calculateSpeed(startTime, generatedCount),
+            isDone: i === count - 1
+          } 
+        });
+        wallets.length = 0; // Clear the batch
+      }
     }
+  } catch (error) {
+    console.error('Error generating wallets:', error);
+    self.postMessage({ 
+      action: 'error', 
+      data: { message: error instanceof Error ? error.message : String(error) } 
+    });
   }
 };

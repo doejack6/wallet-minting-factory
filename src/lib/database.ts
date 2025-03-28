@@ -109,11 +109,16 @@ class WalletDatabase {
     this.isProcessingQueue = true;
     
     try {
-      // 取出队列中的第一批钱包
-      const batch = this.writeQueue.shift();
-      if (batch && batch.length > 0) {
-        // 实际处理这批钱包
-        await this.processBatch(batch);
+      // 处理队列中的所有批次，而不仅仅是第一批
+      while (this.writeQueue.length > 0) {
+        const batch = this.writeQueue.shift();
+        if (batch && batch.length > 0) {
+          console.log(`Processing batch of ${batch.length} wallets`);
+          await this.processBatch(batch);
+        }
+        
+        // 允许UI更新
+        await new Promise(resolve => setTimeout(resolve, 0));
       }
     } catch (error) {
       console.error('Error processing wallet queue:', error);
@@ -135,6 +140,8 @@ class WalletDatabase {
     const startTime = Date.now();
     
     try {
+      console.log(`Processing batch of ${wallets.length} wallets...`);
+      
       // Convert to compact format if compression is enabled
       const compactWallets = wallets.map(wallet => this.compactifyWallet(wallet));
       
@@ -181,7 +188,13 @@ class WalletDatabase {
       }
       
       // 持久化到 IndexedDB
-      await indexedDBStorage.saveWallets(compactWallets);
+      try {
+        await indexedDBStorage.saveWallets(compactWallets);
+        console.log(`Successfully saved ${compactWallets.length} wallets to IndexedDB`);
+      } catch (error) {
+        console.error('Failed to save wallets to IndexedDB:', error);
+        // Continue even if IndexedDB fails - we still have wallets in memory
+      }
       
       console.log(`Database: Stored ${wallets.length} wallets in ${Date.now() - startTime}ms. Total: ${this.wallets.length}`);
     } catch (error) {
@@ -233,7 +246,7 @@ class WalletDatabase {
         }
       }
     } else {
-      // 钱包数量较少，直接添加到队列
+      // 钱包��量较少，直接添加到队列
       this.queueWallets(wallets);
     }
     
