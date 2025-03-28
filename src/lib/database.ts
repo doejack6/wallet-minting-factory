@@ -8,6 +8,7 @@ class WalletDatabase {
   private lastCount = 0;
   private todayCount = 0;
   private addressSet: Set<string> = new Set(); // For fast duplicate checking
+  private processingBatch = false; // Flag to prevent concurrent processing
   
   constructor() {
     // Initialize database
@@ -37,63 +38,82 @@ class WalletDatabase {
       return;
     }
     
-    const startTime = Date.now();
-    
-    // Process wallets in smaller chunks to avoid blocking the main thread
-    const chunkSize = 1000;
-    const totalWallets = wallets.length;
-    let uniqueWalletsCount = 0;
-    
-    for (let i = 0; i < totalWallets; i += chunkSize) {
-      const chunk = wallets.slice(i, i + chunkSize);
-      
-      // Filter out duplicates by checking against the address set
-      const uniqueWalletsInChunk = chunk.filter(wallet => {
-        if (this.addressSet.has(wallet.address)) {
-          return false;
-        }
-        this.addressSet.add(wallet.address);
-        return true;
-      });
-      
-      uniqueWalletsCount += uniqueWalletsInChunk.length;
-      
-      // Add unique wallets to the collection
-      if (uniqueWalletsInChunk.length > 0) {
-        this.wallets = [...this.wallets, ...uniqueWalletsInChunk];
-      }
-    }
-    
-    if (uniqueWalletsCount === 0) {
-      console.log('Database: All wallets were duplicates, nothing to store');
+    if (this.processingBatch) {
+      console.log('Database: Already processing a batch, skipping');
       return;
     }
     
-    this.lastWrite = new Date();
-    this.todayCount += uniqueWalletsCount;
+    this.processingBatch = true;
+    const startTime = Date.now();
     
-    // Calculate write speed
-    const now = Date.now();
-    const elapsed = (now - this.lastSpeedUpdate) / 1000;
-    
-    if (elapsed >= 0.5) { // Reduced from 1 to 0.5 seconds for more frequent updates
-      this.writeSpeed = Math.round((this.wallets.length - this.lastCount) / elapsed);
-      this.lastSpeedUpdate = now;
-      this.lastCount = this.wallets.length;
-    }
-    
-    // Dispatch event for other components to listen to
-    if (typeof window !== 'undefined' && window.dispatchEvent) {
-      window.dispatchEvent(new CustomEvent('walletsStored', {
-        detail: {
-          count: uniqueWalletsCount,
-          total: this.wallets.length,
-          time: Date.now() - startTime
+    try {
+      // Process wallets in smaller chunks to avoid blocking the main thread
+      // Increased chunk size for better efficiency
+      const chunkSize = 2000; // Increased from 1000 to 2000
+      const totalWallets = wallets.length;
+      let uniqueWalletsCount = 0;
+      
+      for (let i = 0; i < totalWallets; i += chunkSize) {
+        const chunk = wallets.slice(i, i + chunkSize);
+        
+        // Use a more efficient approach to filter duplicates
+        const uniqueWalletsInChunk: Wallet[] = [];
+        
+        for (const wallet of chunk) {
+          if (!this.addressSet.has(wallet.address)) {
+            this.addressSet.add(wallet.address);
+            uniqueWalletsInChunk.push(wallet);
+          }
         }
-      }));
+        
+        uniqueWalletsCount += uniqueWalletsInChunk.length;
+        
+        // Add unique wallets to the collection - more efficient append
+        if (uniqueWalletsInChunk.length > 0) {
+          this.wallets.push(...uniqueWalletsInChunk);
+        }
+        
+        // Allow UI to update between chunks by yielding to event loop
+        if (i + chunkSize < totalWallets) {
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
+      }
+      
+      if (uniqueWalletsCount === 0) {
+        console.log('Database: All wallets were duplicates, nothing to store');
+        this.processingBatch = false;
+        return;
+      }
+      
+      this.lastWrite = new Date();
+      this.todayCount += uniqueWalletsCount;
+      
+      // Calculate write speed
+      const now = Date.now();
+      const elapsed = (now - this.lastSpeedUpdate) / 1000;
+      
+      if (elapsed >= 0.2) { // Reduced from 0.5 to 0.2 seconds for more frequent updates
+        this.writeSpeed = Math.round((this.wallets.length - this.lastCount) / elapsed);
+        this.lastSpeedUpdate = now;
+        this.lastCount = this.wallets.length;
+      }
+      
+      // Dispatch event for other components to listen to
+      if (typeof window !== 'undefined' && window.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent('walletsStored', {
+          detail: {
+            count: uniqueWalletsCount,
+            total: this.wallets.length,
+            time: Date.now() - startTime
+          }
+        }));
+      }
+      
+      console.log(`Database: Stored ${uniqueWalletsCount} unique wallets in ${Date.now() - startTime}ms. Total: ${this.wallets.length}`);
+    } finally {
+      // Ensure we always clear the processing flag
+      this.processingBatch = false;
     }
-    
-    console.log(`Database: Stored ${uniqueWalletsCount} unique wallets in ${Date.now() - startTime}ms. Total: ${this.wallets.length}`);
   }
   
   public async getWallets(options: FilterOptions): Promise<Wallet[]> {

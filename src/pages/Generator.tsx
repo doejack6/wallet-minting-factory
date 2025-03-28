@@ -5,7 +5,7 @@ import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { AlertTriangle, Play, Pause, Settings, RefreshCw, TrendingUp, AlertCircle } from 'lucide-react';
+import { AlertTriangle, Play, Pause, Settings, RefreshCw, TrendingUp, AlertCircle, Shield } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { walletGenerator } from '@/lib/walletGenerator';
@@ -23,12 +23,14 @@ const Generator: React.FC = () => {
   const [targetSpeed, setTargetSpeed] = useState(100000);
   const [currentSpeed, setCurrentSpeed] = useState(0);
   const [autoSave, setAutoSave] = useState(true);
-  const [saveFrequency, setSaveFrequency] = useState<number>(1000); // 保存频率，默认1000ms（1秒）
+  const [saveFrequency, setSaveFrequency] = useState<number>(100); // Default to 100ms for faster saving
   const [generatedCount, setGeneratedCount] = useState(0);
   const [savedCount, setSavedCount] = useState(0);
   const [recentWallets, setRecentWallets] = useState<Wallet[]>([]);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [activeTab, setActiveTab] = useState('trc20');
+  const [storageEfficiency, setStorageEfficiency] = useState(0);
+  const [autoAdjustSpeed, setAutoAdjustSpeed] = useState(true);
   
   const [config, setConfig] = useState<GeneratorConfig>({
     trc20Ratio: 50,
@@ -47,10 +49,20 @@ const Generator: React.FC = () => {
     setSavedCount(dbCount);
     setGeneratedCount(genCount);
     
+    // Calculate initial storage efficiency
+    if (genCount > 0) {
+      setStorageEfficiency(Math.floor((dbCount / genCount) * 100));
+    }
+    
     walletGenerator.setOnProgress((stats) => {
       setCurrentSpeed(stats.speed);
       setGeneratedCount(stats.count);
       setSavedCount(stats.savedCount);
+      
+      // Update storage efficiency
+      if (stats.count > 0) {
+        setStorageEfficiency(Math.floor((stats.savedCount / stats.count) * 100));
+      }
     });
     
     const uiUpdateInterval = setInterval(() => {
@@ -60,17 +72,39 @@ const Generator: React.FC = () => {
         
         setSavedCount(walletDB.getTotalCount());
         setGeneratedCount(walletGenerator.getTotalGenerated());
+        
+        // Auto-adjust speed if enabled
+        if (autoAdjustSpeed && storageEfficiency < 30 && targetSpeed > 20000) {
+          const newSpeed = Math.max(20000, targetSpeed * 0.8);
+          setTargetSpeed(newSpeed);
+          walletGenerator.setTargetSpeed(newSpeed);
+          
+          // Notify user about speed adjustment
+          if (targetSpeed - newSpeed > 10000) {
+            toast({
+              title: "自动速度调整",
+              description: `由于存储效率低(${storageEfficiency}%)，生成速度已自动降低。`,
+            });
+          }
+        }
       }
-    }, 250); // Update UI more frequently (reduced from 500ms)
+    }, 250);
     
     const dbSaveInterval = setInterval(() => {
       if (walletGenerator.isRunning() && autoSave) {
-        const walletsToSave = walletGenerator.getLastBatch(2000); // Increased batch size from 500 to 2000
+        const walletsToSave = walletGenerator.getLastBatch(5000); // Increased batch size from 2000 to 5000
         if (walletsToSave.length > 0) {
           console.log(`Generator UI: Saving ${walletsToSave.length} wallets to database`);
           walletDB.storeWallets(walletsToSave)
             .then(() => {
               setSavedCount(walletDB.getTotalCount());
+              
+              // Calculate storage efficiency
+              const totalGenerated = walletGenerator.getTotalGenerated();
+              if (totalGenerated > 0) {
+                setStorageEfficiency(Math.floor((walletDB.getTotalCount() / totalGenerated) * 100));
+              }
+              
               console.log(`Generator UI: Updated saved count to ${walletDB.getTotalCount()}`);
             })
             .catch(error => {
@@ -83,15 +117,21 @@ const Generator: React.FC = () => {
             });
         }
       }
-    }, saveFrequency / 4); // Run 4x more frequently than the selected save frequency
+    }, saveFrequency);
     
     const handleWalletsStored = (e: any) => {
       setSavedCount(e.detail.total);
-      console.log(`Generator UI: Wallets stored event received. Total: ${e.detail.total}`);
+      // Update efficiency when wallets are stored
+      const totalGenerated = walletGenerator.getTotalGenerated();
+      if (totalGenerated > 0) {
+        setStorageEfficiency(Math.floor((e.detail.total / totalGenerated) * 100));
+      }
+      console.log(`Generator UI: Wallets stored event received. Total: ${e.detail.total}, Efficiency: ${storageEfficiency}%`);
     };
     
     const handleDatabaseCleared = () => {
       setSavedCount(0);
+      setStorageEfficiency(0);
       console.log('Generator UI: Database cleared event received');
     };
     
@@ -104,7 +144,7 @@ const Generator: React.FC = () => {
       window.removeEventListener('walletsStored', handleWalletsStored);
       window.removeEventListener('databaseCleared', handleDatabaseCleared);
     };
-  }, [autoSave, toast, saveFrequency]);
+  }, [autoSave, toast, saveFrequency, targetSpeed, storageEfficiency, autoAdjustSpeed]);
   
   const toggleGenerator = () => {
     if (isRunning) {
@@ -149,6 +189,7 @@ const Generator: React.FC = () => {
       walletGenerator.resetGeneratedCount();
       setGeneratedCount(0);
       setElapsedTime(0);
+      setStorageEfficiency(0);
       toast({
         title: "计数器已重置",
         description: "钱包生成统计数据已被重置。",
@@ -184,9 +225,35 @@ const Generator: React.FC = () => {
     setActiveTab(value);
   };
 
-  const storageEfficiency = generatedCount > 0 
-    ? Math.floor((savedCount / generatedCount) * 100) 
-    : 0;
+  const getStorageEfficiencyClass = () => {
+    if (storageEfficiency < 30) return "text-red-500";
+    if (storageEfficiency < 70) return "text-amber-500";
+    return "text-green-500";
+  };
+
+  const getProgressBarClass = () => {
+    if (storageEfficiency < 30) return "bg-red-200";
+    if (storageEfficiency < 70) return "bg-amber-200";
+    return "bg-green-200";
+  };
+
+  const getOptimalSaveFrequency = () => {
+    // Calculate optimal save frequency based on target speed
+    if (targetSpeed > 500000) return 50; // Very high speed
+    if (targetSpeed > 200000) return 100; // High speed
+    if (targetSpeed > 50000) return 200; // Medium speed
+    return 500; // Low speed
+  };
+
+  useEffect(() => {
+    // Auto-adjust save frequency when target speed changes
+    if (autoSave) {
+      const optimal = getOptimalSaveFrequency();
+      if (saveFrequency !== optimal) {
+        setSaveFrequency(optimal);
+      }
+    }
+  }, [targetSpeed, autoSave]);
 
   return (
     <div className="space-y-6">
@@ -200,7 +267,7 @@ const Generator: React.FC = () => {
         </Button>
       </div>
       
-      {storageEfficiency < 30 && generatedCount > 100000 && (
+      {storageEfficiency < 30 && generatedCount > 10000 && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>存储效率低</AlertTitle>
@@ -254,23 +321,27 @@ const Generator: React.FC = () => {
                 <Label htmlFor="autosave">自动保存到数据库</Label>
               </div>
               
+              <div className="flex items-center space-x-2">
+                <Switch id="auto-adjust" checked={autoAdjustSpeed} onCheckedChange={setAutoAdjustSpeed} />
+                <Label htmlFor="auto-adjust">自动调整速度以提高存储效率</Label>
+              </div>
+              
               {autoSave && (
                 <div className="ml-7">
                   <Label htmlFor="save-frequency" className="text-sm mb-2 block">保存频率</Label>
                   <Select
                     value={saveFrequency.toString()}
                     onValueChange={(value) => setSaveFrequency(Number(value))}
-                    disabled={isRunning}
                   >
                     <SelectTrigger id="save-frequency" className="w-full">
                       <SelectValue placeholder="选择保存频率" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="50">极速 (50毫秒)</SelectItem>
                       <SelectItem value="100">非常快 (100毫秒)</SelectItem>
-                      <SelectItem value="500">快速 (500毫秒)</SelectItem>
-                      <SelectItem value="1000">正常 (1秒)</SelectItem>
-                      <SelectItem value="5000">慢速 (5秒)</SelectItem>
-                      <SelectItem value="10000">很慢 (10秒)</SelectItem>
+                      <SelectItem value="200">快速 (200毫秒)</SelectItem>
+                      <SelectItem value="500">正常 (500毫秒)</SelectItem>
+                      <SelectItem value="1000">慢速 (1秒)</SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -306,21 +377,26 @@ const Generator: React.FC = () => {
             <div className="space-y-2">
               <div className="flex justify-between text-sm mb-1">
                 <span>存储效率</span>
-                <span className={storageEfficiency < 30 ? "text-red-500" : storageEfficiency < 70 ? "text-amber-500" : "text-green-500"}>
+                <span className={getStorageEfficiencyClass()}>
                   {storageEfficiency}%
                 </span>
               </div>
               <Progress 
                 value={storageEfficiency} 
-                className={`h-2 ${
-                  storageEfficiency < 30 ? "bg-red-200" : 
-                  storageEfficiency < 70 ? "bg-amber-200" : 
-                  "bg-green-200"
-                }`} 
+                className={`h-2 ${getProgressBarClass()}`} 
               />
               <p className="text-xs text-muted-foreground">
                 生成的钱包中已成功保存到数据库的百分比
               </p>
+              
+              {storageEfficiency < 50 && (
+                <div className="mt-2 p-2 bg-secondary rounded-lg">
+                  <p className="text-xs flex items-center">
+                    <Shield className="h-3 w-3 mr-1" />
+                    提示: 降低生成速度或增加保存频率可以提高存储效率
+                  </p>
+                </div>
+              )}
             </div>
             
             <div className="flex items-center space-x-2 pt-2">
