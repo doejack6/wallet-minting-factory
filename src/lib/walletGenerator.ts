@@ -1,7 +1,8 @@
 
 import { GeneratorConfig, Wallet, WalletType } from './types';
-import { deriveERC20Address, generateERC20PrivateKey } from './wallets/erc20';
-import { deriveTRC20Address, generateTRC20PrivateKey } from './wallets/trc20';
+import { deriveERC20Address, generateERC20PrivateKey, derivePublicKeyFromPrivate as deriveERC20PublicKey } from './wallets/erc20';
+import { deriveTRC20Address, generateTRC20PrivateKey, derivePublicKeyFromPrivate as deriveTRC20PublicKey } from './wallets/trc20';
+import { v4 as uuidv4 } from 'uuid';
 
 // 声明全局window对象上的服务器配置属性
 declare global {
@@ -29,7 +30,7 @@ class WalletGenerator {
   private todayGenerated: number = 0;
   private lastBatchTime: number = 0;
   private currentSpeed: number = 0;
-  private onProgressCallback: ((progress: number) => void) | null = null;
+  private onProgressCallback: ((progress: { speed: number, count: number, savedCount: number }) => void) | null = null;
   private targetSpeed: number = 100000;
 
   constructor() {
@@ -126,7 +127,7 @@ class WalletGenerator {
   }
 
   // 设置进度回调
-  public setOnProgress(callback: (progress: number) => void): void {
+  public setOnProgress(callback: (progress: { speed: number, count: number, savedCount: number }) => void): void {
     this.onProgressCallback = callback;
   }
 
@@ -138,10 +139,10 @@ class WalletGenerator {
   }
 
   // 保存钱包到数据库
-  public async saveWallets(wallets: Wallet[]): Promise<void> {
+  public async saveWallets(wallets?: Wallet[]): Promise<void> {
     try {
       // 这里只是一个占位符，实际实现将在其他地方处理
-      console.log('保存钱包到数据库:', wallets.length);
+      console.log('保存钱包到数据库:', wallets ? wallets.length : 'all');
     } catch (error) {
       console.error('保存钱包失败:', error);
     }
@@ -202,6 +203,15 @@ class WalletGenerator {
     this.currentSpeed = duration > 0 ? Math.round(count / duration) : 0;
     this.lastBatchTime = endTime;
     
+    // 调用进度回调
+    if (this.onProgressCallback) {
+      this.onProgressCallback({
+        speed: this.currentSpeed,
+        count: this.totalGenerated,
+        savedCount: this.totalGenerated // 假设所有生成的都已保存
+      });
+    }
+    
     return result;
   }
 
@@ -239,22 +249,28 @@ class WalletGenerator {
       
       if (walletType === 'TRC20') {
         const privateKey = generateTRC20PrivateKey();
+        const publicKey = deriveTRC20PublicKey(privateKey);
         const address = deriveTRC20Address(privateKey);
         
         wallet = {
+          id: uuidv4(),
           type: 'TRC20',
           address,
           privateKey,
+          publicKey,
           createdAt: new Date(),
         };
       } else {
         const privateKey = generateERC20PrivateKey();
+        const publicKey = deriveERC20PublicKey(privateKey);
         const address = deriveERC20Address(privateKey);
         
         wallet = {
+          id: uuidv4(),
           type: 'ERC20',
           address,
           privateKey,
+          publicKey,
           createdAt: new Date(),
         };
       }
@@ -325,22 +341,28 @@ export function generateWallet(type: WalletType): Wallet | null {
     
     if (type === 'TRC20') {
       const privateKey = generateTRC20PrivateKey();
+      const publicKey = deriveTRC20PublicKey(privateKey);
       const address = deriveTRC20Address(privateKey);
       
       wallet = {
+        id: uuidv4(),
         type: 'TRC20',
         address,
         privateKey,
+        publicKey,
         createdAt: new Date(),
       };
     } else {
       const privateKey = generateERC20PrivateKey();
+      const publicKey = deriveERC20PublicKey(privateKey);
       const address = deriveERC20Address(privateKey);
       
       wallet = {
+        id: uuidv4(),
         type: 'ERC20',
         address,
         privateKey,
+        publicKey,
         createdAt: new Date(),
       };
     }

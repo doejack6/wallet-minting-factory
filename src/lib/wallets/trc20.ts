@@ -7,6 +7,7 @@ import { sha256Bytes } from '../crypto/hash';
 import { base58check } from '../crypto/base58';
 import { ec as EC } from 'elliptic';
 import * as CryptoJS from 'crypto-js';
+import { v4 as uuidv4 } from 'uuid';
 
 // 使用elliptic库进行椭圆曲线计算
 const ec = new EC('secp256k1');
@@ -104,4 +105,20 @@ export function hexToTronAddress(hexAddress: string): string {
   
   // 使用Base58Check编码
   return base58check(addressBytes, 0x41);
+}
+
+// Helper function to generate a complete TRC20 wallet
+export function generateTRC20Wallet(): { id: string, type: 'TRC20', address: string, privateKey: string, publicKey: string, createdAt: Date } {
+  const privateKey = generateTRC20PrivateKey();
+  const publicKey = derivePublicKeyFromPrivate(privateKey);
+  const address = deriveTRC20Address(privateKey);
+  
+  return {
+    id: uuidv4(),
+    type: 'TRC20',
+    address,
+    privateKey,
+    publicKey,
+    createdAt: new Date()
+  };
 }

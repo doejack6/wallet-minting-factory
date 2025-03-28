@@ -6,6 +6,7 @@ import { generateValidPrivateKey, bytesToHex, hexToBytes } from '../crypto/rando
 import { keccak256Any } from '../crypto/hash';
 import * as CryptoJS from 'crypto-js';
 import { ec as EC } from 'elliptic';
+import { v4 as uuidv4 } from 'uuid';
 
 // 使用elliptic库进行椭圆曲线计算
 const ec = new EC('secp256k1');
@@ -107,14 +108,17 @@ export function toChecksumAddress(address: string): string {
 }
 
 // Helper function to generate a complete ERC20 wallet
-export function generateERC20Wallet(): { type: 'ERC20', address: string, privateKey: string, createdAt: Date } {
+export function generateERC20Wallet(): { id: string, type: 'ERC20', address: string, privateKey: string, publicKey: string, createdAt: Date } {
   const privateKey = generateERC20PrivateKey();
+  const publicKey = derivePublicKeyFromPrivate(privateKey);
   const address = deriveERC20Address(privateKey);
   
   return {
+    id: uuidv4(),
     type: 'ERC20',
     address,
     privateKey,
+    publicKey,
     createdAt: new Date()
   };
 }
