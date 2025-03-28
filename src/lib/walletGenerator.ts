@@ -1,5 +1,5 @@
 
-import { WalletType, Wallet } from './types';
+import { WalletType, Wallet, GeneratorConfig } from './types';
 
 // Mock implementation of a high-performance wallet generator
 // In a real application, this would use proper cryptographic libraries
@@ -69,14 +69,48 @@ export class WalletGeneratorEngine {
   private startTime: Date | null = null;
   private lastSpeedUpdate = 0;
   private lastSample = 0;
+  private todayGenerated = 0;
   private onProgress: ((stats: { count: number, speed: number }) => void) | null = null;
+  
+  // Advanced configuration options
+  private config: GeneratorConfig = {
+    trc20Ratio: 50, // 50% TRC20
+    threadCount: 4,
+    batchSize: 1000,
+    memoryLimit: 512, // MB
+  };
   
   constructor() {
     // Initialize engine
+    this.resetDailyCount();
+    
+    // Reset today's count at midnight
+    const now = new Date();
+    const midnight = new Date(now);
+    midnight.setHours(24, 0, 0, 0);
+    const timeToMidnight = midnight.getTime() - now.getTime();
+    
+    setTimeout(() => {
+      this.resetDailyCount();
+      // Set up daily reset
+      setInterval(() => this.resetDailyCount(), 24 * 60 * 60 * 1000);
+    }, timeToMidnight);
+  }
+  
+  private resetDailyCount(): void {
+    this.todayGenerated = 0;
   }
   
   public setOnProgress(callback: (stats: { count: number, speed: number }) => void): void {
     this.onProgress = callback;
+  }
+  
+  public setConfig(config: Partial<GeneratorConfig>): void {
+    this.config = { ...this.config, ...config };
+  }
+  
+  public getConfig(): GeneratorConfig {
+    return { ...this.config };
   }
   
   public start(): void {
@@ -84,9 +118,8 @@ export class WalletGeneratorEngine {
     
     this.running = true;
     this.startTime = new Date();
-    this.generatedCount = 0;
     this.lastSpeedUpdate = Date.now();
-    this.lastSample = 0;
+    this.lastSample = this.generatedCount;
     
     this.runGenerationCycle();
   }
@@ -101,6 +134,14 @@ export class WalletGeneratorEngine {
   
   public getTotalGenerated(): number {
     return this.generatedCount;
+  }
+  
+  public getTodayGenerated(): number {
+    return this.todayGenerated;
+  }
+  
+  public getTypeCount(type: WalletType): number {
+    return this.wallets.filter(wallet => wallet.type === type).length;
   }
   
   public getUptime(): number {
@@ -125,16 +166,21 @@ export class WalletGeneratorEngine {
     
     // For demo purposes, we generate a smaller batch
     // In real implementation this would be done in a more efficient way
-    const batchSize = Math.min(1000, this.targetSpeed / 20);
+    const batchSize = Math.min(this.config.batchSize, this.targetSpeed / 20);
     
-    // Generate TRC20 and ERC20 wallets alternately
-    const trc20Batch = generateWalletBatch(batchSize / 2, 'TRC20');
-    const erc20Batch = generateWalletBatch(batchSize / 2, 'ERC20');
+    // Calculate how many of each type to generate based on ratio
+    const trc20Count = Math.round(batchSize * (this.config.trc20Ratio / 100));
+    const erc20Count = batchSize - trc20Count;
+    
+    // Generate wallets according to configured ratio
+    const trc20Batch = generateWalletBatch(trc20Count, 'TRC20');
+    const erc20Batch = generateWalletBatch(erc20Count, 'ERC20');
     
     // Store for recent access (limited to 1000 most recent for demo)
     this.wallets = [...this.wallets, ...trc20Batch, ...erc20Batch].slice(-1000);
     
     this.generatedCount += batchSize;
+    this.todayGenerated += batchSize;
     
     // Calculate generation speed
     const now = Date.now();
@@ -154,9 +200,10 @@ export class WalletGeneratorEngine {
       }
     }
     
-    // Schedule next cycle
+    // Schedule next cycle based on thread count (simulated)
     // In real implementation, we would adjust this based on performance metrics
-    setTimeout(() => this.runGenerationCycle(), 50);
+    const cycleTime = 50 / this.config.threadCount; // Adjust cycle time based on thread count
+    setTimeout(() => this.runGenerationCycle(), cycleTime);
   }
 }
 

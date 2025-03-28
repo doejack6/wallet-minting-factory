@@ -10,8 +10,16 @@ export interface Wallet {
   createdAt: Date;
 }
 
+export interface GeneratorConfig {
+  trc20Ratio: number; // TRC20生成比例 (0-100)
+  threadCount: number; // 线程数
+  batchSize: number; // 批处理大小
+  memoryLimit: number; // 内存限制(MB)
+}
+
 export interface GeneratorStats {
   totalGenerated: number;
+  todayGenerated: number;
   trc20Count: number;
   erc20Count: number;
   generationSpeed: number;
@@ -24,6 +32,8 @@ export interface DatabaseStats {
   databaseSize: string;
   lastWrite: Date | null;
   writeSpeed: number;
+  trc20Count: number;
+  erc20Count: number;
 }
 
 export interface FilterOptions {

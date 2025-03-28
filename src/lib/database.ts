@@ -1,5 +1,5 @@
 
-import { Wallet, WalletType, FilterOptions } from './types';
+import { Wallet, WalletType, FilterOptions, DatabaseStats } from './types';
 
 // Mock implementation of a high-performance database
 // In a real application, this would use IndexedDB, SQLite, or other storage solution
@@ -10,10 +10,28 @@ class WalletDatabase {
   private writeSpeed = 0;
   private lastSpeedUpdate = 0;
   private lastCount = 0;
+  private todayCount = 0;
   
   constructor() {
     // Initialize database
     console.log('Initializing wallet database...');
+    this.resetDailyCount();
+    
+    // Reset today's count at midnight
+    const now = new Date();
+    const midnight = new Date(now);
+    midnight.setHours(24, 0, 0, 0);
+    const timeToMidnight = midnight.getTime() - now.getTime();
+    
+    setTimeout(() => {
+      this.resetDailyCount();
+      // Set up daily reset
+      setInterval(() => this.resetDailyCount(), 24 * 60 * 60 * 1000);
+    }, timeToMidnight);
+  }
+  
+  private resetDailyCount(): void {
+    this.todayCount = 0;
   }
   
   public async storeWallets(wallets: Wallet[]): Promise<void> {
@@ -22,6 +40,7 @@ class WalletDatabase {
     // In a real implementation, this would batch insert to a database
     this.wallets = [...this.wallets, ...wallets];
     this.lastWrite = new Date();
+    this.todayCount += wallets.length;
     
     // Calculate write speed
     const now = Date.now();
@@ -78,6 +97,10 @@ class WalletDatabase {
     return this.wallets.length;
   }
   
+  public getTodayCount(): number {
+    return this.todayCount;
+  }
+  
   public getLastWrite(): Date | null {
     return this.lastWrite;
   }
@@ -105,6 +128,17 @@ class WalletDatabase {
     } else {
       return `${(totalBytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
     }
+  }
+  
+  public getStats(): DatabaseStats {
+    return {
+      totalStored: this.getTotalCount(),
+      databaseSize: this.getDatabaseSize(),
+      lastWrite: this.getLastWrite(),
+      writeSpeed: this.getWriteSpeed(),
+      trc20Count: this.getTypeCount('TRC20'),
+      erc20Count: this.getTypeCount('ERC20'),
+    };
   }
   
   public async clearDatabase(): Promise<void> {

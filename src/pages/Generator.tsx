@@ -14,6 +14,8 @@ import { walletDB } from '@/lib/database';
 import { useToast } from '@/components/ui/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Input } from '@/components/ui/input';
+import { GeneratorConfig } from '@/lib/types';
 
 const Generator: React.FC = () => {
   const { toast } = useToast();
@@ -27,10 +29,19 @@ const Generator: React.FC = () => {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [activeTab, setActiveTab] = useState('trc20');
   
+  // 高级配置选项
+  const [config, setConfig] = useState<GeneratorConfig>({
+    trc20Ratio: 50,
+    threadCount: 4,
+    batchSize: 1000,
+    memoryLimit: 512,
+  });
+  
   // Initialize and set up event listeners
   useEffect(() => {
     // Update state from wallet generator
     setIsRunning(walletGenerator.isRunning());
+    setConfig(walletGenerator.getConfig());
     
     // Set up progress callback
     walletGenerator.setOnProgress((stats) => {
@@ -77,6 +88,7 @@ const Generator: React.FC = () => {
       });
     } else {
       walletGenerator.setTargetSpeed(targetSpeed);
+      walletGenerator.setConfig(config);
       walletGenerator.start();
       setIsRunning(true);
       toast({
@@ -116,6 +128,21 @@ const Generator: React.FC = () => {
       toast({
         title: "无法重置",
         description: "请先停止生成器，然后再重置计数器。",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // 更新配置设置
+  const updateConfig = (key: keyof GeneratorConfig, value: number) => {
+    if (!isRunning) {
+      const newConfig = { ...config, [key]: value };
+      setConfig(newConfig);
+      walletGenerator.setConfig(newConfig);
+    } else {
+      toast({
+        title: "无法更改配置",
+        description: "请先停止生成器，然后再更改配置。",
         variant: "destructive",
       });
     }
@@ -257,36 +284,86 @@ const Generator: React.FC = () => {
                       配置钱包生成器的高级选项
                     </SheetDescription>
                   </SheetHeader>
-                  <div className="py-4 space-y-4">
-                    <div className="space-y-2">
-                      <h3 className="text-sm font-medium">生成比例</h3>
-                      <div className="grid grid-cols-2 gap-4">
+                  <div className="py-4 space-y-6">
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-semibold">生成比例</h3>
+                      <div className="space-y-2">
+                        <Label htmlFor="trc20-ratio">TRC20 比例: {config.trc20Ratio}%</Label>
+                        <Slider 
+                          id="trc20-ratio"
+                          value={[config.trc20Ratio]} 
+                          min={0} 
+                          max={100} 
+                          step={5}
+                          disabled={isRunning}
+                          onValueChange={(value) => updateConfig('trc20Ratio', value[0])}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 mt-2">
                         <div className="p-4 bg-secondary rounded-lg">
                           <div className="text-xs text-muted-foreground mb-1">TRC20</div>
-                          <div className="text-lg font-bold">50%</div>
+                          <div className="text-lg font-bold">{config.trc20Ratio}%</div>
                         </div>
                         <div className="p-4 bg-secondary rounded-lg">
                           <div className="text-xs text-muted-foreground mb-1">ERC20</div>
-                          <div className="text-lg font-bold">50%</div>
+                          <div className="text-lg font-bold">{100 - config.trc20Ratio}%</div>
                         </div>
                       </div>
                     </div>
                     
-                    <div className="space-y-2">
-                      <h3 className="text-sm font-medium">性能设置</h3>
-                      <div className="p-4 bg-secondary rounded-lg space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs">线程数</span>
-                          <span className="text-xs font-medium">4</span>
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-semibold">性能设置</h3>
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-3 items-center gap-2">
+                          <Label htmlFor="thread-count">线程数</Label>
+                          <Input 
+                            id="thread-count"
+                            type="number" 
+                            value={config.threadCount} 
+                            onChange={(e) => updateConfig('threadCount', Math.max(1, Number(e.target.value)))}
+                            className="col-span-2"
+                            min={1}
+                            max={16}
+                            disabled={isRunning}
+                          />
                         </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs">批处理大小</span>
-                          <span className="text-xs font-medium">1000</span>
+                        
+                        <div className="grid grid-cols-3 items-center gap-2">
+                          <Label htmlFor="batch-size">批处理大小</Label>
+                          <Input 
+                            id="batch-size"
+                            type="number" 
+                            value={config.batchSize} 
+                            onChange={(e) => updateConfig('batchSize', Math.max(100, Number(e.target.value)))}
+                            className="col-span-2"
+                            min={100}
+                            max={10000}
+                            step={100}
+                            disabled={isRunning}
+                          />
                         </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs">内存限制</span>
-                          <span className="text-xs font-medium">512MB</span>
+                        
+                        <div className="grid grid-cols-3 items-center gap-2">
+                          <Label htmlFor="memory-limit">内存限制(MB)</Label>
+                          <Input 
+                            id="memory-limit"
+                            type="number" 
+                            value={config.memoryLimit} 
+                            onChange={(e) => updateConfig('memoryLimit', Math.max(128, Number(e.target.value)))}
+                            className="col-span-2"
+                            min={128}
+                            max={4096}
+                            step={128}
+                            disabled={isRunning}
+                          />
                         </div>
+                      </div>
+                      
+                      <div className="p-4 bg-muted rounded-lg text-xs text-muted-foreground space-y-2 mt-2">
+                        <p>• 增加线程数可提高生成速度，但会增加CPU使用率</p>
+                        <p>• 增大批处理大小可提高效率，但会增加内存使用</p>
+                        <p>• 内存限制决定了程序可使用的最大内存</p>
                       </div>
                     </div>
                   </div>
