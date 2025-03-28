@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,7 @@ import { walletGenerator } from '@/lib/walletGenerator';
 import { walletDB } from '@/lib/database';
 import { useToast } from '@/components/ui/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const Generator: React.FC = () => {
   const { toast } = useToast();
@@ -23,6 +25,7 @@ const Generator: React.FC = () => {
   const [generatedCount, setGeneratedCount] = useState(0);
   const [recentWallets, setRecentWallets] = useState<any[]>([]);
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [activeTab, setActiveTab] = useState('trc20');
   
   // Initialize and set up event listeners
   useEffect(() => {
@@ -35,11 +38,11 @@ const Generator: React.FC = () => {
       setGeneratedCount(stats.count);
     });
     
-    // Update UI every second and save to database based on saveFrequency
+    // Update UI every second
     const uiUpdateInterval = setInterval(() => {
       if (walletGenerator.isRunning()) {
         setElapsedTime(walletGenerator.getUptime());
-        setRecentWallets(walletGenerator.getLastBatch(10));
+        setRecentWallets(walletGenerator.getLastBatch(20));
       }
     }, 1000);
     
@@ -116,6 +119,15 @@ const Generator: React.FC = () => {
         variant: "destructive",
       });
     }
+  };
+
+  // 过滤指定类型的钱包
+  const getFilteredWallets = (type: 'TRC20' | 'ERC20') => {
+    return recentWallets.filter(wallet => wallet.type.toUpperCase() === type.toUpperCase());
+  };
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
   };
 
   return (
@@ -289,65 +301,65 @@ const Generator: React.FC = () => {
         </Card>
         
         <Card>
-          <Tabs defaultValue="trc20">
+          <Tabs defaultValue="trc20" onValueChange={handleTabChange}>
             <CardHeader className="pb-0">
               <CardTitle>已生成的钱包</CardTitle>
-              <TabsList className="mt-2">
-                <TabsTrigger value="trc20">TRC20</TabsTrigger>
-                <TabsTrigger value="erc20">ERC20</TabsTrigger>
+              <TabsList className="mt-2 w-full">
+                <TabsTrigger value="trc20" className="flex-1">TRC20</TabsTrigger>
+                <TabsTrigger value="erc20" className="flex-1">ERC20</TabsTrigger>
               </TabsList>
             </CardHeader>
             <CardContent className="pt-6">
               <TabsContent value="trc20" className="mt-0">
-                <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
-                  {recentWallets
-                    .filter(wallet => wallet.type === 'TRC20')
-                    .map((wallet, index) => (
-                      <div key={index} className="p-3 bg-secondary rounded-md text-xs">
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="font-medium">TRC20 钱包</span>
-                          <span className="text-muted-foreground">
-                            {wallet.createdAt.toLocaleTimeString()}
-                          </span>
+                <ScrollArea className="h-[350px]">
+                  <div className="space-y-3 pr-3">
+                    {getFilteredWallets('TRC20').length > 0 ? (
+                      getFilteredWallets('TRC20').map((wallet, index) => (
+                        <div key={index} className="p-3 bg-secondary rounded-md text-xs">
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="font-medium">TRC20 钱包</span>
+                            <span className="text-muted-foreground">
+                              {wallet.createdAt.toLocaleTimeString()}
+                            </span>
+                          </div>
+                          <div className="font-mono break-all">
+                            {wallet.address}
+                          </div>
                         </div>
-                        <div className="font-mono break-all">
-                          {wallet.address}
-                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-6 text-muted-foreground">
+                        尚未生成 TRC20 钱包。
                       </div>
-                    ))}
-                  
-                  {recentWallets.filter(wallet => wallet.type === 'TRC20').length === 0 && (
-                    <div className="text-center py-6 text-muted-foreground">
-                      尚未生成 TRC20 钱包。
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                </ScrollArea>
               </TabsContent>
               
               <TabsContent value="erc20" className="mt-0">
-                <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
-                  {recentWallets
-                    .filter(wallet => wallet.type === 'ERC20')
-                    .map((wallet, index) => (
-                      <div key={index} className="p-3 bg-secondary rounded-md text-xs">
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="font-medium">ERC20 钱包</span>
-                          <span className="text-muted-foreground">
-                            {wallet.createdAt.toLocaleTimeString()}
-                          </span>
+                <ScrollArea className="h-[350px]">
+                  <div className="space-y-3 pr-3">
+                    {getFilteredWallets('ERC20').length > 0 ? (
+                      getFilteredWallets('ERC20').map((wallet, index) => (
+                        <div key={index} className="p-3 bg-secondary rounded-md text-xs">
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="font-medium">ERC20 钱包</span>
+                            <span className="text-muted-foreground">
+                              {wallet.createdAt.toLocaleTimeString()}
+                            </span>
+                          </div>
+                          <div className="font-mono break-all">
+                            {wallet.address}
+                          </div>
                         </div>
-                        <div className="font-mono break-all">
-                          {wallet.address}
-                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-6 text-muted-foreground">
+                        尚未生成 ERC20 钱包。
                       </div>
-                    ))}
-                  
-                  {recentWallets.filter(wallet => wallet.type === 'ERC20').length === 0 && (
-                    <div className="text-center py-6 text-muted-foreground">
-                      尚未生成 ERC20 钱包。
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                </ScrollArea>
               </TabsContent>
             </CardContent>
           </Tabs>
