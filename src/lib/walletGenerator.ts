@@ -171,14 +171,14 @@ export class WalletGeneratorEngine {
     if (this.syncInterval === null) {
       this.syncInterval = window.setInterval(() => {
         this.synchronizeWithDatabase();
-      }, 5000); // Check every 5 seconds
+      }, 1000); // Check every 1 second (reduced from 5 seconds)
     }
     
-    // Set up automatic sync to database at a reasonable interval to avoid too frequent syncing
+    // Set up automatic sync to database at a shorter interval
     if (this.dbSyncInterval === null) {
       this.dbSyncInterval = window.setInterval(() => {
         this.syncWithDatabase();
-      }, 2000); // Sync every 2 seconds
+      }, 500); // Sync every 500ms (reduced from 2 seconds)
     }
     
     this.runGenerationCycle();
@@ -250,41 +250,31 @@ export class WalletGeneratorEngine {
   private async syncWithDatabase() {
     if (!this.running) return;
     
-    // Take a smaller batch to save to avoid overwhelming the database
-    const batchToSave = this.getLastBatch(500);
+    // Take a larger batch to save to improve database synchronization
+    const batchToSave = this.getLastBatch(1000); // Increased from 500
     if (batchToSave.length > 0) {
       try {
-        // Filter for unique wallets not already in our tracking set
-        const uniqueWallets = batchToSave.filter(wallet => {
-          if (this.addressSet.has(wallet.address)) {
-            return false;
-          }
-          // Add to our set for future checks
-          this.addressSet.add(wallet.address);
-          return true;
-        });
+        console.log(`Generator: Attempting to save ${batchToSave.length} wallets to database`);
         
-        if (uniqueWallets.length > 0) {
-          console.log(`Generator: Saving ${uniqueWallets.length} unique wallets to database`);
-          
-          // Save the unique wallets to the database
-          await walletDB.storeWallets(uniqueWallets);
-          
-          // Update saved count from database
-          this.savedToDbCount = walletDB.getTotalCount();
-          
-          // Update progress if callback is set
-          if (this.onProgress) {
-            this.onProgress({
-              count: this.realGeneratedCount,
-              speed: this.generationSpeed,
-              savedCount: this.savedToDbCount
-            });
-          }
+        // Save the wallets to the database directly, let the database handle duplicates
+        await walletDB.storeWallets(batchToSave);
+        
+        // Update saved count from database
+        this.savedToDbCount = walletDB.getTotalCount();
+        
+        // Update progress if callback is set
+        if (this.onProgress) {
+          this.onProgress({
+            count: this.realGeneratedCount,
+            speed: this.generationSpeed,
+            savedCount: this.savedToDbCount
+          });
         }
       } catch (error) {
         console.error('Failed to sync wallets with database', error);
       }
+    } else {
+      console.log('Generator: No wallets to save to database');
     }
   }
   
@@ -302,22 +292,14 @@ export class WalletGeneratorEngine {
     
     const newBatch = [...trc20Batch, ...erc20Batch];
     
-    // Filter out wallets with addresses that we've already seen
-    const uniqueNewBatch = newBatch.filter(wallet => {
-      if (this.addressSet.has(wallet.address)) {
-        return false;
-      }
-      this.addressSet.add(wallet.address);
-      return true;
-    });
-    
-    // Keep the most recent wallets for display, with a reasonable limit
-    this.wallets = [...this.wallets, ...uniqueNewBatch].slice(-1000);
+    // Store all newly generated wallets without filtering for uniqueness here
+    // The uniqueness check will be done in the database
+    this.wallets = [...this.wallets, ...newBatch].slice(-1000);
     
     // Increment counters for generated wallets
-    this.generatedCount += uniqueNewBatch.length;
-    this.realGeneratedCount += uniqueNewBatch.length;
-    this.todayGenerated += uniqueNewBatch.length;
+    this.generatedCount += newBatch.length;
+    this.realGeneratedCount += newBatch.length;
+    this.todayGenerated += newBatch.length;
     
     // Update generation speed calculation
     const now = Date.now();

@@ -60,15 +60,17 @@ const Generator: React.FC = () => {
         setSavedCount(walletDB.getTotalCount());
         setGeneratedCount(walletGenerator.getTotalGenerated());
       }
-    }, 1000);
+    }, 500); // Update UI more frequently (reduced from 1000ms)
     
     const dbSaveInterval = setInterval(() => {
       if (walletGenerator.isRunning() && autoSave) {
-        const walletsToSave = walletGenerator.getLastBatch(100);
+        const walletsToSave = walletGenerator.getLastBatch(500); // Increased batch size from 100
         if (walletsToSave.length > 0) {
+          console.log(`Generator UI: Saving ${walletsToSave.length} wallets to database`);
           walletDB.storeWallets(walletsToSave)
             .then(() => {
               setSavedCount(walletDB.getTotalCount());
+              console.log(`Generator UI: Updated saved count to ${walletDB.getTotalCount()}`);
             })
             .catch(error => {
               console.error('Failed to save wallets to database', error);
@@ -84,10 +86,12 @@ const Generator: React.FC = () => {
     
     const handleWalletsStored = (e: any) => {
       setSavedCount(e.detail.total);
+      console.log(`Generator UI: Wallets stored event received. Total: ${e.detail.total}`);
     };
     
     const handleDatabaseCleared = () => {
       setSavedCount(0);
+      console.log('Generator UI: Database cleared event received');
     };
     
     window.addEventListener('walletsStored', handleWalletsStored);
