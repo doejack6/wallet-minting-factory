@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,7 +14,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
-import { GeneratorConfig } from '@/lib/types';
+import { GeneratorConfig, Wallet } from '@/lib/types';
 
 const Generator: React.FC = () => {
   const { toast } = useToast();
@@ -25,7 +24,7 @@ const Generator: React.FC = () => {
   const [autoSave, setAutoSave] = useState(true);
   const [saveFrequency, setSaveFrequency] = useState<number>(1000); // 保存频率，默认1000ms（1秒）
   const [generatedCount, setGeneratedCount] = useState(0);
-  const [recentWallets, setRecentWallets] = useState<any[]>([]);
+  const [recentWallets, setRecentWallets] = useState<Wallet[]>([]);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [activeTab, setActiveTab] = useState('trc20');
   
@@ -53,7 +52,9 @@ const Generator: React.FC = () => {
     const uiUpdateInterval = setInterval(() => {
       if (walletGenerator.isRunning()) {
         setElapsedTime(walletGenerator.getUptime());
-        setRecentWallets(walletGenerator.getLastBatch(20));
+        // Get the latest generated wallets
+        const latestWallets = walletGenerator.getLastBatch(20);
+        setRecentWallets(latestWallets);
       }
     }, 1000);
     
@@ -133,7 +134,6 @@ const Generator: React.FC = () => {
     }
   };
 
-  // 更新配置设置
   const updateConfig = (key: keyof GeneratorConfig, value: number) => {
     if (!isRunning) {
       const newConfig = { ...config, [key]: value };
@@ -148,9 +148,8 @@ const Generator: React.FC = () => {
     }
   };
 
-  // 过滤指定类型的钱包
   const getFilteredWallets = (type: 'TRC20' | 'ERC20') => {
-    return recentWallets.filter(wallet => wallet.type.toUpperCase() === type.toUpperCase());
+    return recentWallets.filter(wallet => wallet.type === type);
   };
 
   const handleTabChange = (value: string) => {
@@ -378,7 +377,7 @@ const Generator: React.FC = () => {
         </Card>
         
         <Card>
-          <Tabs defaultValue="trc20" onValueChange={handleTabChange}>
+          <Tabs defaultValue={activeTab} onValueChange={handleTabChange}>
             <CardHeader className="pb-0">
               <CardTitle>已生成的钱包</CardTitle>
               <TabsList className="mt-2 w-full">
@@ -392,7 +391,7 @@ const Generator: React.FC = () => {
                   <div className="space-y-3 pr-3">
                     {getFilteredWallets('TRC20').length > 0 ? (
                       getFilteredWallets('TRC20').map((wallet, index) => (
-                        <div key={index} className="p-3 bg-secondary rounded-md text-xs">
+                        <div key={wallet.id} className="p-3 bg-secondary rounded-md text-xs">
                           <div className="flex justify-between items-center mb-1">
                             <span className="font-medium">TRC20 钱包</span>
                             <span className="text-muted-foreground">
@@ -418,7 +417,7 @@ const Generator: React.FC = () => {
                   <div className="space-y-3 pr-3">
                     {getFilteredWallets('ERC20').length > 0 ? (
                       getFilteredWallets('ERC20').map((wallet, index) => (
-                        <div key={index} className="p-3 bg-secondary rounded-md text-xs">
+                        <div key={wallet.id} className="p-3 bg-secondary rounded-md text-xs">
                           <div className="flex justify-between items-center mb-1">
                             <span className="font-medium">ERC20 钱包</span>
                             <span className="text-muted-foreground">
