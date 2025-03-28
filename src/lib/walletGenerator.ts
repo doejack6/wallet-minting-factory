@@ -1,4 +1,3 @@
-
 import { Wallet, WalletType, GeneratorConfig } from './types';
 import { walletDB } from './database';
 
@@ -49,8 +48,59 @@ function generateERC20Address(): string {
   return '0x' + generateRandomHex(40);
 }
 
-// Generate a private key - 64 hex chars (32 bytes)
-function generatePrivateKey(): string {
+// Generate a Tron (TRC20) private key
+// TRC20 private keys must be 64 hex characters and represent a valid ECDSA private key
+function generateTRC20PrivateKey(): string {
+  // TRC20 private keys must be in the range [1, n-1] where n is the curve order
+  // For simplicity, we'll ensure it's a 64-character hex string (32 bytes)
+  
+  // Use crypto API for better randomness
+  if (typeof window !== 'undefined' && window.crypto) {
+    const privateKeyBytes = new Uint8Array(32); // 32 bytes = 64 hex chars
+    window.crypto.getRandomValues(privateKeyBytes);
+    
+    // Ensure the first bit is not set (to keep it positive and in range)
+    privateKeyBytes[0] = privateKeyBytes[0] & 0x7F;
+    
+    // Ensure it's not zero (extremely unlikely)
+    let isZero = true;
+    for (let i = 0; i < privateKeyBytes.length; i++) {
+      if (privateKeyBytes[i] !== 0) {
+        isZero = false;
+        break;
+      }
+    }
+    
+    if (isZero) {
+      privateKeyBytes[31] = 1; // Set the last byte to 1 if all bytes are 0
+    }
+    
+    // Convert to hex string
+    return Array.from(privateKeyBytes)
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+  } else {
+    // Fallback for environments without crypto API
+    // Generate 64 hex characters, representing 32 bytes
+    let privateKey = '';
+    const hexChars = '0123456789abcdef';
+    
+    // First byte should not have the highest bit set (to stay in valid range)
+    const firstByteChar1 = hexChars.charAt(Math.floor(Math.random() * 8)); // 0-7 only for first char
+    const firstByteChar2 = hexChars.charAt(Math.floor(Math.random() * 16));
+    privateKey = firstByteChar1 + firstByteChar2;
+    
+    // Generate the remaining 62 characters
+    for (let i = 0; i < 62; i++) {
+      privateKey += hexChars.charAt(Math.floor(Math.random() * 16));
+    }
+    
+    return privateKey;
+  }
+}
+
+// Generate an ERC20 private key - 64 hex chars (32 bytes)
+function generateERC20PrivateKey(): string {
   return generateRandomHex(64);
 }
 
@@ -63,7 +113,7 @@ function generatePublicKey(): string {
 
 // Generate a single wallet
 export function generateWallet(type: WalletType): Wallet {
-  const privateKey = generatePrivateKey();
+  const privateKey = type === 'TRC20' ? generateTRC20PrivateKey() : generateERC20PrivateKey();
   const publicKey = generatePublicKey();
   const address = type === 'TRC20' ? generateTRC20Address() : generateERC20Address();
   
