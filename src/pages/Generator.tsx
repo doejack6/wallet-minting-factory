@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -30,7 +29,6 @@ const Generator: React.FC = () => {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [activeTab, setActiveTab] = useState('trc20');
   
-  // 高级配置选项
   const [config, setConfig] = useState<GeneratorConfig>({
     trc20Ratio: 50,
     threadCount: 4,
@@ -38,34 +36,27 @@ const Generator: React.FC = () => {
     memoryLimit: 512,
   });
   
-  // Initialize and set up event listeners
   useEffect(() => {
-    // Update state from wallet generator
     setIsRunning(walletGenerator.isRunning());
     setConfig(walletGenerator.getConfig());
     
-    // Get initial database count
     setSavedCount(walletDB.getTotalCount());
     walletGenerator.setSavedCount(walletDB.getTotalCount());
     
-    // Set up progress callback
     walletGenerator.setOnProgress((stats) => {
       setCurrentSpeed(stats.speed);
       setGeneratedCount(stats.count);
       setSavedCount(stats.savedCount);
     });
     
-    // Update UI every second
     const uiUpdateInterval = setInterval(() => {
       if (walletGenerator.isRunning()) {
         setElapsedTime(walletGenerator.getUptime());
-        // Get the latest generated wallets
         const latestWallets = walletGenerator.getLastBatch(20);
         setRecentWallets(latestWallets);
       }
     }, 1000);
     
-    // Set up separate interval for database saving based on saveFrequency
     const dbSaveInterval = setInterval(() => {
       if (walletGenerator.isRunning() && autoSave) {
         const walletsToSave = walletGenerator.getLastBatch(100);
@@ -92,6 +83,20 @@ const Generator: React.FC = () => {
     };
   }, [autoSave, toast, saveFrequency]);
   
+  useEffect(() => {
+    const updateStats = () => {
+      const totalGenerated = walletGenerator.getTotalGenerated();
+      const savedToDatabase = walletDB.getTotalCount();
+      
+      setGeneratedCount(totalGenerated);
+      setSavedCount(savedToDatabase);
+    };
+    
+    const interval = setInterval(updateStats, 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
+
   const toggleGenerator = () => {
     if (isRunning) {
       walletGenerator.stop();
@@ -161,7 +166,6 @@ const Generator: React.FC = () => {
     }
   };
 
-  // Function to filter wallets by type
   const getFilteredWallets = (type: 'TRC20' | 'ERC20') => {
     return recentWallets.filter(wallet => wallet.type === type);
   };

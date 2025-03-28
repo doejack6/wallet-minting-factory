@@ -1,5 +1,5 @@
-
 import { WalletType, Wallet, GeneratorConfig } from './types';
+import { walletDB } from './database';
 
 // Mock implementation of a high-performance wallet generator
 // In a real application, this would use proper cryptographic libraries
@@ -134,6 +134,9 @@ export class WalletGeneratorEngine {
     this.lastSpeedUpdate = Date.now();
     this.lastSample = this.generatedCount;
     
+    // Ensure initial database sync when starting
+    this.syncWithDatabase();
+    
     this.runGenerationCycle();
   }
   
@@ -174,6 +177,17 @@ export class WalletGeneratorEngine {
     return this.wallets.slice(-limit);
   }
   
+  private async syncWithDatabase() {
+    // Periodically sync generated wallets with the database
+    const batchToSave = this.getLastBatch(1000);
+    try {
+      await walletDB.storeWallets(batchToSave);
+      this.setSavedCount(walletDB.getTotalCount());
+    } catch (error) {
+      console.error('Failed to sync wallets with database', error);
+    }
+  }
+  
   private runGenerationCycle(): void {
     if (!this.running) return;
     
@@ -212,6 +226,11 @@ export class WalletGeneratorEngine {
           savedCount: this.savedToDbCount
         });
       }
+    }
+    
+    // Add periodic database sync
+    if (this.generatedCount % 10000 === 0) {
+      this.syncWithDatabase();
     }
     
     // Schedule next cycle based on thread count (simulated)

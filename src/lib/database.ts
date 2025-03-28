@@ -1,9 +1,4 @@
-
-import { Wallet, WalletType, FilterOptions, DatabaseStats, SearchPatternType } from './types';
-import { walletGenerator } from './walletGenerator';
-
-// Mock implementation of a high-performance database
-// In a real application, this would use IndexedDB, SQLite, or other storage solution
+import { Wallet, WalletType, FilterOptions, DatabaseStats } from './types';
 
 class WalletDatabase {
   private wallets: Wallet[] = [];
@@ -36,30 +31,22 @@ class WalletDatabase {
   }
   
   public async storeWallets(wallets: Wallet[]): Promise<void> {
-    const startTime = Date.now();
+    const uniqueWallets = wallets.filter(
+      wallet => !this.wallets.some(existingWallet => existingWallet.address === wallet.address)
+    );
     
-    // In a real implementation, this would batch insert to a database
-    this.wallets = [...this.wallets, ...wallets];
+    this.wallets = [...this.wallets, ...uniqueWallets];
     this.lastWrite = new Date();
-    this.todayCount += wallets.length;
+    this.todayCount += uniqueWallets.length;
     
-    // Calculate write speed
+    // More robust write speed calculation
     const now = Date.now();
     const elapsed = (now - this.lastSpeedUpdate) / 1000;
     
     if (elapsed >= 1) {
-      this.writeSpeed = Math.round((this.wallets.length - this.lastCount) / elapsed);
-      this.lastCount = this.wallets.length;
+      this.writeSpeed = Math.round(uniqueWallets.length / elapsed);
       this.lastSpeedUpdate = now;
     }
-    
-    // Update wallet generator with current database count
-    if (walletGenerator) {
-      walletGenerator.setSavedCount(this.wallets.length);
-    }
-    
-    // Simulate database latency
-    await new Promise(resolve => setTimeout(resolve, 10));
   }
   
   public async getWallets(options: FilterOptions): Promise<Wallet[]> {
