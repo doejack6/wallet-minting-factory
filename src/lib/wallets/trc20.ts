@@ -3,46 +3,71 @@
  * TRC20钱包生成逻辑 - 按照TRON官方规范实现
  */
 import { generateValidPrivateKey, bytesToHex, hexToBytes } from '../crypto/random';
-import { keccak256Any, sha256Bytes } from '../crypto/hash';
+import { sha256Bytes } from '../crypto/hash';
 import { base58check } from '../crypto/base58';
+import { ec as EC } from 'elliptic';
+import * as CryptoJS from 'crypto-js';
+
+// 使用elliptic库进行椭圆曲线计算
+const ec = new EC('secp256k1');
 
 // 生成TRC20私钥
 export function generateTRC20PrivateKey(): string {
   return generateValidPrivateKey();
 }
 
-// 从私钥生成公钥
+// 从私钥生成公钥 (使用secp256k1椭圆曲线)
 export function derivePublicKeyFromPrivate(privateKey: string): string {
-  // 注意：在真实实现中，这里应该使用secp256k1椭圆曲线算法
-  // 从私钥计算公钥。由于我们没有实际的secp256k1库，这里提供一个模拟的公钥
-  
-  // 创建一个确定性但伪造的公钥以保持一致性 (与ERC20类似但有所区别)
-  const hash1 = keccak256Any(privateKey + "tron");
-  const hash2 = keccak256Any(hash1 + privateKey);
-  
-  // 真实公钥是65字节：1字节前缀 + 32字节X坐标 + 32字节Y坐标
-  return "04" + hash1 + hash2.substring(0, 64 - hash1.length);
+  try {
+    // 确保私钥没有0x前缀
+    if (privateKey.startsWith('0x')) {
+      privateKey = privateKey.slice(2);
+    }
+    
+    // 使用secp256k1曲线从私钥创建密钥对
+    const keyPair = ec.keyFromPrivate(privateKey, 'hex');
+    
+    // 获取公钥（非压缩格式，包含04前缀）
+    const publicKey = keyPair.getPublic('hex');
+    
+    return publicKey;
+  } catch (error) {
+    console.error('Error deriving public key:', error);
+    throw new Error('无法从私钥推导公钥');
+  }
 }
 
 // 从私钥推导TRC20地址 - 严格遵循TRON标准
 export function deriveTRC20Address(privateKey: string): string {
-  // 1. 获取公钥 (在真实实现中用secp256k1从私钥派生)
-  const publicKey = derivePublicKeyFromPrivate(privateKey);
-  
-  // 2. 对公钥哈希化 (跳过第一个字节 0x04)
-  const publicKeyNoPrefix = publicKey.slice(2); // 移除04前缀
-  const publicKeyBytes = hexToBytes(publicKeyNoPrefix);
-  
-  // 3. 计算keccak256哈希
-  const keccak256Hash = keccak256Any(publicKeyBytes);
-  
-  // 4. 取哈希的最后20字节（40个十六进制字符）作为原始地址
-  const addressHex = keccak256Hash.slice(-40);
-  const addressBytes = hexToBytes(addressHex);
-  
-  // 5. 添加TRON地址前缀(0x41)并使用Base58Check编码
-  // TRON地址的前缀是0x41 (十进制65)
-  return base58check(addressBytes, 0x41);
+  try {
+    // 确保私钥格式正确
+    if (privateKey.startsWith('0x')) {
+      privateKey = privateKey.slice(2);
+    }
+    
+    // 1. 从私钥获取公钥
+    const fullPublicKey = derivePublicKeyFromPrivate(privateKey);
+    
+    // 2. 移除公钥的前缀(04)，获取完整的X和Y坐标
+    const publicKeyWithoutPrefix = fullPublicKey.slice(2);
+    
+    // 3. 对公钥进行SHA3-256(Keccak)哈希
+    const sha3Hash = CryptoJS.SHA3(
+      CryptoJS.enc.Hex.parse(publicKeyWithoutPrefix), 
+      { outputLength: 256 }
+    );
+    const sha3HashHex = sha3Hash.toString(CryptoJS.enc.Hex);
+    
+    // 4. 取SHA3哈希的最后20字节
+    const addressHex = sha3HashHex.slice(-40);
+    const addressBytes = hexToBytes(addressHex);
+    
+    // 5. 添加TRON地址前缀(0x41 = 65)并使用Base58Check编码
+    return base58check(addressBytes, 0x41);
+  } catch (error) {
+    console.error('Error deriving TRC20 address:', error);
+    throw new Error('无法从私钥推导TRC20地址');
+  }
 }
 
 // 验证TRC20地址格式
@@ -71,7 +96,7 @@ export function hexToTronAddress(hexAddress: string): string {
   
   // 确保长度为40
   if (hexAddress.length !== 40) {
-    throw new Error("Invalid hex address length");
+    throw new Error("无效的十六进制地址长度");
   }
   
   // 转换为字节数组并添加前缀

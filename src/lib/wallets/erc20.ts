@@ -1,43 +1,67 @@
 
 /**
- * ERC20钱包生成逻辑
+ * ERC20钱包生成逻辑 - 按照以太坊官方标准
  */
 import { generateValidPrivateKey, bytesToHex, hexToBytes } from '../crypto/random';
 import { keccak256Any } from '../crypto/hash';
+import * as CryptoJS from 'crypto-js';
+import { ec as EC } from 'elliptic';
+
+// 使用elliptic库进行椭圆曲线计算
+const ec = new EC('secp256k1');
 
 // 生成ERC20私钥
 export function generateERC20PrivateKey(): string {
   return generateValidPrivateKey();
 }
 
-// 从私钥推导公钥 (根据以太坊标准)
+// 从私钥推导公钥 (使用secp256k1椭圆曲线)
 export function derivePublicKeyFromPrivate(privateKey: string): string {
-  // 注意：在真实实现中，这里应该使用secp256k1椭圆曲线算法
-  // 从私钥计算公钥。由于我们没有实际的secp256k1库，这里提供一个模拟的公钥
-  // 在实际应用中，应该使用适当的加密库如 ethereumjs-util 或 web3.js
-  
-  // 创建一个确定性但伪造的公钥以保持一致性
-  const hash1 = keccak256Any(privateKey);
-  const hash2 = keccak256Any(hash1 + privateKey);
-  
-  // 真实公钥是65字节：1字节前缀 + 32字节X坐标 + 32字节Y坐标
-  return "04" + hash1 + hash2.substring(0, 64 - hash1.length);
+  try {
+    // 确保私钥没有0x前缀
+    if (privateKey.startsWith('0x')) {
+      privateKey = privateKey.slice(2);
+    }
+    
+    // 使用secp256k1曲线从私钥创建密钥对
+    const keyPair = ec.keyFromPrivate(privateKey, 'hex');
+    
+    // 获取公钥（非压缩格式，包含04前缀）
+    const publicKey = keyPair.getPublic('hex');
+    
+    return publicKey;
+  } catch (error) {
+    console.error('Error deriving public key:', error);
+    throw new Error('无法从私钥推导公钥');
+  }
 }
 
-// 从私钥推导ERC20地址 (根据以太坊标准)
+// 从私钥推导ERC20地址 (按以太坊官方标准)
 export function deriveERC20Address(privateKey: string): string {
-  // 步骤1：应该使用secp256k1曲线从私钥推导公钥（无压缩格式）
-  const publicKeyHex = derivePublicKeyFromPrivate(privateKey);
-  
-  // 步骤2：对公钥进行Keccak-256哈希（不包括0x04前缀）
-  const publicKeyBytes = hexToBytes(publicKeyHex.slice(2));
-  const hash = keccak256Any(publicKeyBytes);
-  
-  // 步骤3：取哈希的最后20字节作为地址
-  const address = "0x" + hash.slice(-40); // 取最后40个字符（20字节）
-  
-  // 返回小写形式的地址
-  return address.toLowerCase();
+  try {
+    // 确保私钥格式正确
+    if (privateKey.startsWith('0x')) {
+      privateKey = privateKey.slice(2);
+    }
+    
+    // 1. 从私钥获取公钥
+    const publicKeyHex = derivePublicKeyFromPrivate(privateKey);
+    
+    // 2. 移除公钥的前缀(04)
+    const publicKeyWithoutPrefix = publicKeyHex.slice(2);
+    
+    // 3. 对公钥进行Keccak-256哈希
+    const hash = keccak256Any(publicKeyWithoutPrefix);
+    
+    // 4. 取哈希的后20字节作为地址
+    const address = '0x' + hash.slice(-40);
+    
+    // 5. 返回小写形式的地址
+    return address.toLowerCase();
+  } catch (error) {
+    console.error('Error deriving ERC20 address:', error);
+    throw new Error('无法从私钥推导ERC20地址');
+  }
 }
 
 // 验证ERC20地址格式
@@ -59,7 +83,7 @@ export function validateERC20Address(address: string): boolean {
 // 将ERC20地址转换为校验和格式
 export function toChecksumAddress(address: string): string {
   if (!validateERC20Address(address)) {
-    throw new Error("Invalid address format");
+    throw new Error("无效的地址格式");
   }
   
   // 移除0x前缀并转为小写
