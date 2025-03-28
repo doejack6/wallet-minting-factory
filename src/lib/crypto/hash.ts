@@ -12,6 +12,18 @@ export function sha256(hexString: string): string {
   return hash.toString(CryptoJS.enc.Hex);
 }
 
+// SHA256哈希函数 (接受字节数组)
+export function sha256Bytes(bytes: Uint8Array): Uint8Array {
+  const wordArray = CryptoJS.lib.WordArray.create(bytes as any);
+  const hash = CryptoJS.SHA256(wordArray);
+  return hexToBytes(hash.toString(CryptoJS.enc.Hex));
+}
+
+// 对字符串进行SHA256哈希
+export function sha256String(str: string): string {
+  return CryptoJS.SHA256(str).toString(CryptoJS.enc.Hex);
+}
+
 // 双重SHA256哈希
 export function doubleSha256(hexString: string): string {
   return sha256(sha256(hexString));
@@ -20,6 +32,16 @@ export function doubleSha256(hexString: string): string {
 // Keccak256哈希函数(以太坊地址用)
 export function keccak256(hexString: string): string {
   const wordArray = CryptoJS.enc.Hex.parse(hexString);
+  const hash = CryptoJS.SHA3(wordArray, { outputLength: 256 });
+  return hash.toString(CryptoJS.enc.Hex);
+}
+
+// 对任意数据进行Keccak256哈希
+export function keccak256Any(data: string | Uint8Array): string {
+  const wordArray = typeof data === 'string' 
+    ? CryptoJS.enc.Hex.parse(data.startsWith('0x') ? data.slice(2) : data)
+    : CryptoJS.lib.WordArray.create(data as any);
+  
   const hash = CryptoJS.SHA3(wordArray, { outputLength: 256 });
   return hash.toString(CryptoJS.enc.Hex);
 }

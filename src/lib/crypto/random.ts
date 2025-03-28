@@ -28,6 +28,15 @@ export function bytesToHex(bytes: Uint8Array): string {
 
 // 从16进制字符串转换为字节数组
 export function hexToBytes(hex: string): Uint8Array {
+  if (hex.startsWith('0x')) {
+    hex = hex.slice(2);
+  }
+  
+  // 确保长度为偶数
+  if (hex.length % 2 !== 0) {
+    hex = '0' + hex;
+  }
+  
   const bytes = new Uint8Array(hex.length / 2);
   for (let i = 0; i < hex.length; i += 2) {
     bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
@@ -40,4 +49,15 @@ export function generateRandomHex(length: number): string {
   const byteLength = Math.ceil(length / 2);
   const bytes = generateRandomBytes(byteLength);
   return bytesToHex(bytes).slice(0, length);
+}
+
+// 生成符合有效私钥格式的随机私钥
+export function generateValidPrivateKey(): string {
+  // 生成32字节的私钥
+  const privateKeyBytes = generateRandomBytes(32);
+  
+  // 确保私钥在有效范围内（避免极端情况）
+  privateKeyBytes[0] = privateKeyBytes[0] & 0x7F; // 清除第一个字节的最高位
+  
+  return bytesToHex(privateKeyBytes);
 }
