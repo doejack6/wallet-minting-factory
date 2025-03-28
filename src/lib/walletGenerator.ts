@@ -1,4 +1,4 @@
-import { Wallet, WalletType } from './types';
+import { Wallet, WalletType, GeneratorConfig } from './types';
 import { walletDB } from './database';
 
 // Mock implementation of a high-performance wallet generator
