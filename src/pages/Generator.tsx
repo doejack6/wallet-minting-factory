@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,7 +16,8 @@ import {
   Shield, 
   Save,
   Cpu,
-  Zap
+  Zap,
+  ListPlus
 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -32,6 +32,8 @@ import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import GeneratorDialog from '@/components/wallets/GeneratorDialog';
+import { backgroundGenerator, BackgroundGenState } from '@/lib/services/backgroundGeneratorService';
 
 const Generator: React.FC = () => {
   const { toast } = useToast();
@@ -43,15 +45,17 @@ const Generator: React.FC = () => {
   const [recentWallets, setRecentWallets] = useState<Wallet[]>([]);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [activeTab, setActiveTab] = useState('trc20');
-  const [storageEfficiency, setStorageEfficiency] = useState(100); // 默认为100%，因为我们现在确保了保存所有生成的钱包
+  const [storageEfficiency, setStorageEfficiency] = useState(100);
   const [isOpenPerformanceInfo, setIsOpenPerformanceInfo] = useState(false);
+  const [showGeneratorDialog, setShowGeneratorDialog] = useState(false);
+  const [backgroundState, setBackgroundState] = useState<BackgroundGenState>(backgroundGenerator.getState());
   
   const [config, setConfig] = useState<GeneratorConfig>({
     trc20Ratio: 50,
-    threadCount: 2, // 降低默认线程数
-    batchSize: 100, // 降低批处理大小
+    threadCount: 2,
+    batchSize: 100,
     memoryLimit: 512,
-    walletTypes: ['TRC20', 'ERC20'], // 默认生成两种类型
+    walletTypes: ['TRC20', 'ERC20'],
   });
   
   useEffect(() => {
@@ -64,15 +68,18 @@ const Generator: React.FC = () => {
     setSavedCount(dbCount);
     setGeneratedCount(genCount);
     
+    const unsubscribe = backgroundGenerator.subscribeTo(state => {
+      setBackgroundState(state);
+    });
+    
     walletGenerator.setOnProgress((stats) => {
       setCurrentSpeed(stats.speed);
       setGeneratedCount(stats.count);
       setSavedCount(stats.savedCount);
       
-      // 计算存储效率
       if (stats.count > 0) {
         const efficiency = Math.floor((stats.savedCount / stats.count) * 100);
-        setStorageEfficiency(Math.min(100, efficiency)); // 确保不超过100%
+        setStorageEfficiency(Math.min(100, efficiency));
       }
     });
     
@@ -84,7 +91,6 @@ const Generator: React.FC = () => {
         setSavedCount(walletDB.getTotalCount());
         setGeneratedCount(walletGenerator.getTotalGenerated());
         
-        // 更新存储效率
         if (generatedCount > 0) {
           const efficiency = Math.floor((savedCount / generatedCount) * 100);
           setStorageEfficiency(Math.min(100, efficiency));
@@ -92,7 +98,6 @@ const Generator: React.FC = () => {
       }
     }, 250);
     
-    // 确保数据库和生成器同步
     const syncInterval = setInterval(() => {
       if (isRunning) {
         const dbCount = walletDB.getTotalCount();
@@ -127,6 +132,7 @@ const Generator: React.FC = () => {
       clearInterval(syncInterval);
       window.removeEventListener('walletsStored', handleWalletsStored);
       window.removeEventListener('databaseCleared', handleDatabaseCleared);
+      unsubscribe();
     };
   }, [isRunning, savedCount, generatedCount]);
   
@@ -150,12 +156,10 @@ const Generator: React.FC = () => {
     }
   };
   
-  const handleSpeedChange = (value: number[]) => {
-    const newSpeed = value[0];
-    setTargetSpeed(newSpeed);
-    walletGenerator.setTargetSpeed(newSpeed);
+  const openBatchGenerator = () => {
+    setShowGeneratorDialog(true);
   };
-
+  
   const formatNumber = (num: number): string => {
     return num.toLocaleString();
   };
@@ -205,12 +209,9 @@ const Generator: React.FC = () => {
     if (!isRunning) {
       const walletTypes = [...config.walletTypes];
       
-      // 如果类型已存在，则移除；否则添加
-      const index = walletTypes.indexOf(type);
-      if (index !== -1) {
-        // 确保至少有一种类型被选中
+      if (walletTypes.indexOf(type) !== -1) {
         if (walletTypes.length > 1) {
-          walletTypes.splice(index, 1);
+          walletTypes.splice(walletTypes.indexOf(type), 1);
         } else {
           toast({
             title: "至少选择一种钱包类型",
@@ -286,6 +287,12 @@ const Generator: React.FC = () => {
             <Save className="mr-2 h-4 w-4" /> 保存钱包
           </Button>
           <Button 
+            onClick={openBatchGenerator}
+            variant="outline"
+          >
+            <ListPlus className="mr-2 h-4 w-4" /> 批量生成
+          </Button>
+          <Button 
             onClick={toggleGenerator}
             className={isRunning ? "bg-red-500 hover:bg-red-600" : "bg-green-500 hover:bg-green-600"}
           >
@@ -293,6 +300,35 @@ const Generator: React.FC = () => {
           </Button>
         </div>
       </div>
+      
+      {backgroundState.isRunning && (
+        <Alert className="bg-blue-50 border-blue-200">
+          <Cpu className="h-4 w-4 text-blue-500" />
+          <AlertTitle>后台生成进行中</AlertTitle>
+          <AlertDescription className="flex justify-between items-center">
+            <span>
+              已生成: {backgroundState.generatedCount.toLocaleString()} / {backgroundState.targetCount.toLocaleString()} 
+              ({Math.round(backgroundState.progress)}%)
+            </span>
+            <div className="flex space-x-2">
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={() => setShowGeneratorDialog(true)}
+              >
+                查看详情
+              </Button>
+              <Button 
+                size="sm" 
+                variant="destructive" 
+                onClick={() => backgroundGenerator.stopGeneration()}
+              >
+                停止
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
       
       <Alert>
         <Shield className="h-4 w-4" />
@@ -635,6 +671,11 @@ const Generator: React.FC = () => {
           </Tabs>
         </Card>
       </div>
+      
+      <GeneratorDialog
+        open={showGeneratorDialog}
+        onOpenChange={setShowGeneratorDialog}
+      />
     </div>
   );
 };

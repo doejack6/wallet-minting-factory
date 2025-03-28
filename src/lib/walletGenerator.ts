@@ -3,8 +3,27 @@ import { Wallet, WalletType, GeneratorConfig } from './types';
 import { walletDB } from './database';
 import { generateTRC20PrivateKey, deriveTRC20Address, derivePublicKeyFromPrivate as deriveTRC20PublicKey } from './wallets/trc20';
 import { generateERC20PrivateKey, deriveERC20Address, derivePublicKeyFromPrivate as deriveERC20PublicKey } from './wallets/erc20';
+import { generateRandomBytes, bytesToHex } from './crypto/random';
 
-// 生成单个钱包
+// 使用更高效的密钥生成 - 批量生成随机字节
+function generateRandomKeys(count: number, size: number = 32): string[] {
+  const bytes = generateRandomBytes(count * size);
+  const keys: string[] = [];
+  
+  for (let i = 0; i < count; i++) {
+    const start = i * size;
+    const keyBytes = bytes.slice(start, start + size);
+    
+    // 确保私钥在有效范围内
+    keyBytes[0] = keyBytes[0] & 0x7F; // 清除第一个字节的最高位
+    
+    keys.push(bytesToHex(keyBytes));
+  }
+  
+  return keys;
+}
+
+// 高性能单个钱包生成
 export function generateWallet(type: WalletType): Wallet {
   let privateKey, publicKey, address;
   
@@ -28,12 +47,55 @@ export function generateWallet(type: WalletType): Wallet {
   };
 }
 
-// 批量生成多个钱包
+// 优化的批量钱包生成 - 使用高效算法
 export function generateWalletBatch(count: number, type: WalletType): Wallet[] {
-  const wallets: Wallet[] = [];
-  for (let i = 0; i < count; i++) {
-    wallets.push(generateWallet(type));
+  // 对于小批量使用常规方法
+  if (count < 10) {
+    const wallets: Wallet[] = [];
+    for (let i = 0; i < count; i++) {
+      wallets.push(generateWallet(type));
+    }
+    return wallets;
   }
+  
+  // 对于大批量使用优化方法
+  const privateKeys = generateRandomKeys(count);
+  const wallets: Wallet[] = [];
+  const now = new Date();
+  
+  // 为了最大性能，使用类型特定的批处理逻辑
+  if (type === 'TRC20') {
+    for (let i = 0; i < count; i++) {
+      const privateKey = privateKeys[i];
+      const publicKey = deriveTRC20PublicKey(privateKey);
+      const address = deriveTRC20Address(privateKey);
+      
+      wallets.push({
+        id: crypto.randomUUID(),
+        address,
+        privateKey,
+        publicKey,
+        type,
+        createdAt: now,
+      });
+    }
+  } else {
+    for (let i = 0; i < count; i++) {
+      const privateKey = privateKeys[i];
+      const publicKey = deriveERC20PublicKey(privateKey);
+      const address = deriveERC20Address(privateKey);
+      
+      wallets.push({
+        id: crypto.randomUUID(),
+        address,
+        privateKey,
+        publicKey,
+        type,
+        createdAt: now,
+      });
+    }
+  }
+  
   return wallets;
 }
 
