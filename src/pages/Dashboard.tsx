@@ -14,6 +14,7 @@ const Dashboard: React.FC = () => {
   const { toast } = useToast();
   const [generatorStats, setGeneratorStats] = useState<GeneratorStats>({
     totalGenerated: 0,
+    todayGenerated: 0, // Added missing property
     trc20Count: 0,
     erc20Count: 0,
     generationSpeed: 0,
@@ -26,6 +27,8 @@ const Dashboard: React.FC = () => {
     databaseSize: '0 bytes',
     lastWrite: null,
     writeSpeed: 0,
+    trc20Count: 0, // Added missing property
+    erc20Count: 0, // Added missing property
   });
   
   const [status, setStatus] = useState<StatusInfo>({
@@ -44,6 +47,7 @@ const Dashboard: React.FC = () => {
         // Update generator stats
         setGeneratorStats({
           totalGenerated: walletGenerator.getTotalGenerated(),
+          todayGenerated: walletGenerator.getTodayGenerated(), // Added missing property
           trc20Count: Math.floor(walletGenerator.getTotalGenerated() / 2), // Assuming 50/50 split
           erc20Count: Math.floor(walletGenerator.getTotalGenerated() / 2),
           generationSpeed: walletGenerator.getCurrentSpeed(),
@@ -68,6 +72,8 @@ const Dashboard: React.FC = () => {
               databaseSize: walletDB.getDatabaseSize(),
               lastWrite: walletDB.getLastWrite(),
               writeSpeed: walletDB.getWriteSpeed(),
+              trc20Count: walletDB.getTypeCount('TRC20'), // Added missing property
+              erc20Count: walletDB.getTypeCount('ERC20'), // Added missing property
             });
           });
       } else {
