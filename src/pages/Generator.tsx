@@ -5,7 +5,7 @@ import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { AlertTriangle, Play, Pause, Settings, RefreshCw, TrendingUp } from 'lucide-react';
+import { AlertTriangle, Play, Pause, Settings, RefreshCw, TrendingUp, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { walletGenerator } from '@/lib/walletGenerator';
@@ -60,11 +60,11 @@ const Generator: React.FC = () => {
         setSavedCount(walletDB.getTotalCount());
         setGeneratedCount(walletGenerator.getTotalGenerated());
       }
-    }, 500); // Update UI more frequently (reduced from 1000ms)
+    }, 250); // Update UI more frequently (reduced from 500ms)
     
     const dbSaveInterval = setInterval(() => {
       if (walletGenerator.isRunning() && autoSave) {
-        const walletsToSave = walletGenerator.getLastBatch(500); // Increased batch size from 100
+        const walletsToSave = walletGenerator.getLastBatch(2000); // Increased batch size from 500 to 2000
         if (walletsToSave.length > 0) {
           console.log(`Generator UI: Saving ${walletsToSave.length} wallets to database`);
           walletDB.storeWallets(walletsToSave)
@@ -82,7 +82,7 @@ const Generator: React.FC = () => {
             });
         }
       }
-    }, saveFrequency);
+    }, saveFrequency / 4); // Run 4x more frequently than the selected save frequency
     
     const handleWalletsStored = (e: any) => {
       setSavedCount(e.detail.total);
@@ -183,6 +183,10 @@ const Generator: React.FC = () => {
     setActiveTab(value);
   };
 
+  const storageEfficiency = generatedCount > 0 
+    ? Math.floor((savedCount / generatedCount) * 100) 
+    : 0;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -194,6 +198,17 @@ const Generator: React.FC = () => {
           {isRunning ? <><Pause className="mr-2 h-4 w-4" /> 停止生成器</> : <><Play className="mr-2 h-4 w-4" /> 启动生成器</>}
         </Button>
       </div>
+      
+      {storageEfficiency < 30 && generatedCount > 100000 && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>存储效率低</AlertTitle>
+          <AlertDescription>
+            仅 {storageEfficiency}% 的生成钱包已保存到数据库。这可能是由于生成速度过快或数据库写入速度过慢造成的。
+            考虑降低生成速度或增加保存频率以提高存储效率。
+          </AlertDescription>
+        </Alert>
+      )}
       
       <Alert>
         <AlertTriangle className="h-4 w-4" />
@@ -285,6 +300,26 @@ const Generator: React.FC = () => {
                   运行时间: {formatTime(elapsedTime)}
                 </div>
               </div>
+            </div>
+            
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm mb-1">
+                <span>存储效率</span>
+                <span className={storageEfficiency < 30 ? "text-red-500" : storageEfficiency < 70 ? "text-amber-500" : "text-green-500"}>
+                  {storageEfficiency}%
+                </span>
+              </div>
+              <Progress 
+                value={storageEfficiency} 
+                className={`h-2 ${
+                  storageEfficiency < 30 ? "bg-red-200" : 
+                  storageEfficiency < 70 ? "bg-amber-200" : 
+                  "bg-green-200"
+                }`} 
+              />
+              <p className="text-xs text-muted-foreground">
+                生成的钱包中已成功保存到数据库的百分比
+              </p>
             </div>
             
             <div className="flex items-center space-x-2 pt-2">

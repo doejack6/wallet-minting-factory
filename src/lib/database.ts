@@ -1,4 +1,3 @@
-
 import { Wallet, WalletType, FilterOptions, DatabaseStats } from './types';
 
 class WalletDatabase {
@@ -40,30 +39,44 @@ class WalletDatabase {
     
     const startTime = Date.now();
     
-    // Filter out duplicates by checking against the address set
-    const uniqueWallets = wallets.filter(wallet => {
-      if (this.addressSet.has(wallet.address)) {
-        return false;
-      }
-      this.addressSet.add(wallet.address);
-      return true;
-    });
+    // Process wallets in smaller chunks to avoid blocking the main thread
+    const chunkSize = 1000;
+    const totalWallets = wallets.length;
+    let uniqueWalletsCount = 0;
     
-    if (uniqueWallets.length === 0) {
+    for (let i = 0; i < totalWallets; i += chunkSize) {
+      const chunk = wallets.slice(i, i + chunkSize);
+      
+      // Filter out duplicates by checking against the address set
+      const uniqueWalletsInChunk = chunk.filter(wallet => {
+        if (this.addressSet.has(wallet.address)) {
+          return false;
+        }
+        this.addressSet.add(wallet.address);
+        return true;
+      });
+      
+      uniqueWalletsCount += uniqueWalletsInChunk.length;
+      
+      // Add unique wallets to the collection
+      if (uniqueWalletsInChunk.length > 0) {
+        this.wallets = [...this.wallets, ...uniqueWalletsInChunk];
+      }
+    }
+    
+    if (uniqueWalletsCount === 0) {
       console.log('Database: All wallets were duplicates, nothing to store');
       return;
     }
     
-    // Add new unique wallets to the collection
-    this.wallets = [...this.wallets, ...uniqueWallets];
     this.lastWrite = new Date();
-    this.todayCount += uniqueWallets.length;
+    this.todayCount += uniqueWalletsCount;
     
     // Calculate write speed
     const now = Date.now();
     const elapsed = (now - this.lastSpeedUpdate) / 1000;
     
-    if (elapsed >= 1) {
+    if (elapsed >= 0.5) { // Reduced from 1 to 0.5 seconds for more frequent updates
       this.writeSpeed = Math.round((this.wallets.length - this.lastCount) / elapsed);
       this.lastSpeedUpdate = now;
       this.lastCount = this.wallets.length;
@@ -73,14 +86,14 @@ class WalletDatabase {
     if (typeof window !== 'undefined' && window.dispatchEvent) {
       window.dispatchEvent(new CustomEvent('walletsStored', {
         detail: {
-          count: uniqueWallets.length,
+          count: uniqueWalletsCount,
           total: this.wallets.length,
           time: Date.now() - startTime
         }
       }));
     }
     
-    console.log(`Database: Stored ${uniqueWallets.length} unique wallets in ${Date.now() - startTime}ms. Total: ${this.wallets.length}`);
+    console.log(`Database: Stored ${uniqueWalletsCount} unique wallets in ${Date.now() - startTime}ms. Total: ${this.wallets.length}`);
   }
   
   public async getWallets(options: FilterOptions): Promise<Wallet[]> {

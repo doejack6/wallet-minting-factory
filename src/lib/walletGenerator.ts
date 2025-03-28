@@ -171,14 +171,14 @@ export class WalletGeneratorEngine {
     if (this.syncInterval === null) {
       this.syncInterval = window.setInterval(() => {
         this.synchronizeWithDatabase();
-      }, 1000); // Check every 1 second (reduced from 5 seconds)
+      }, 200); // Check every 200ms (reduced from 1000ms)
     }
     
     // Set up automatic sync to database at a shorter interval
     if (this.dbSyncInterval === null) {
       this.dbSyncInterval = window.setInterval(() => {
         this.syncWithDatabase();
-      }, 500); // Sync every 500ms (reduced from 2 seconds)
+      }, 100); // Sync every 100ms (reduced from 500ms)
     }
     
     this.runGenerationCycle();
@@ -250,8 +250,8 @@ export class WalletGeneratorEngine {
   private async syncWithDatabase() {
     if (!this.running) return;
     
-    // Take a larger batch to save to improve database synchronization
-    const batchToSave = this.getLastBatch(1000); // Increased from 500
+    // Take a much larger batch to save to improve database synchronization
+    const batchToSave = this.getLastBatch(5000); // Increased from 1000 to 5000
     if (batchToSave.length > 0) {
       try {
         console.log(`Generator: Attempting to save ${batchToSave.length} wallets to database`);
@@ -321,7 +321,8 @@ export class WalletGeneratorEngine {
     }
     
     // Schedule next cycle - adjust timing based on thread count
-    const cycleTime = 50 / this.config.threadCount;
+    // Reduce the cycle time for higher throughput
+    const cycleTime = 25 / this.config.threadCount; // Reduced from 50 to 25
     setTimeout(() => this.runGenerationCycle(), cycleTime);
   }
 }
