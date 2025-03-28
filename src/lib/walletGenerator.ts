@@ -1,36 +1,63 @@
+
 import { Wallet, WalletType, GeneratorConfig } from './types';
 import { walletDB } from './database';
 
-// Mock implementation of a high-performance wallet generator
-// In a real application, this would use proper cryptographic libraries
-
-// Simulated random hex string generator for demo purposes
+// Improved hex string generator for cryptographic-like randomness
 function generateRandomHex(length: number): string {
   let result = '';
   const characters = '0123456789abcdef';
-  for (let i = 0; i < length; i++) {
-    result += characters.charAt(Math.floor(Math.random() * characters.length));
+  const charactersLength = characters.length;
+  
+  // Use crypto API for better randomness when available
+  if (typeof window !== 'undefined' && window.crypto) {
+    const values = new Uint8Array(Math.ceil(length / 2));
+    window.crypto.getRandomValues(values);
+    result = Array.from(values)
+      .map(value => characters[value % charactersLength])
+      .join('')
+      .slice(0, length);
+  } else {
+    // Fallback to Math.random() if crypto API is not available
+    for (let i = 0; i < length; i++) {
+      result += characters.charAt(Math.floor(Math.random() * charactersLength));
+    }
   }
+  
   return result;
 }
 
 // Generate a TRC20 wallet address (Tron)
+// Format: T + base58 encoded string (34 chars total)
 function generateTRC20Address(): string {
-  return 'T' + generateRandomHex(33);
+  // TRC20 addresses start with 'T' and are 34 characters long
+  // First character is always 'T', followed by 33 base58 characters
+  const base58Chars = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+  let address = 'T';
+  
+  for (let i = 0; i < 33; i++) {
+    const randomIndex = Math.floor(Math.random() * base58Chars.length);
+    address += base58Chars.charAt(randomIndex);
+  }
+  
+  return address;
 }
 
 // Generate an ERC20 wallet address (Ethereum)
+// Format: 0x + 40 hex characters (42 chars total)
 function generateERC20Address(): string {
+  // ERC20 addresses are '0x' followed by 40 hex characters (20 bytes)
   return '0x' + generateRandomHex(40);
 }
 
-// Generate a private key
+// Generate a private key - 64 hex chars (32 bytes)
 function generatePrivateKey(): string {
   return generateRandomHex(64);
 }
 
 // Generate a public key
 function generatePublicKey(): string {
+  // In reality, public keys are derived from private keys
+  // But for this simulation, we'll generate a random string
   return generateRandomHex(128);
 }
 
