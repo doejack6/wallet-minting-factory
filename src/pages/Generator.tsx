@@ -58,6 +58,10 @@ const Generator: React.FC = () => {
     walletTypes: ['TRC20', 'ERC20'],
   });
   
+  const handleSpeedChange = (values: number[]) => {
+    setTargetSpeed(values[0]);
+  };
+
   useEffect(() => {
     setIsRunning(walletGenerator.isRunning());
     setConfig(walletGenerator.getConfig());
