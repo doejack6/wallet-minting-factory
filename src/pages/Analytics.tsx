@@ -179,29 +179,29 @@ const Analytics = () => {
             <CardDescription>
               查看不同时间段的钱包生成数量
             </CardDescription>
-            <TabsList className="mt-2">
-              <TabsTrigger 
-                value="daily"
-                onClick={() => setChartPeriod('daily')}
-                className={chartPeriod === 'daily' ? "bg-primary text-primary-foreground" : ""}
-              >
-                24小时
-              </TabsTrigger>
-              <TabsTrigger 
-                value="weekly"
-                onClick={() => setChartPeriod('weekly')}
-                className={chartPeriod === 'weekly' ? "bg-primary text-primary-foreground" : ""}
-              >
-                7天
-              </TabsTrigger>
-              <TabsTrigger 
-                value="monthly"
-                onClick={() => setChartPeriod('monthly')}
-                className={chartPeriod === 'monthly' ? "bg-primary text-primary-foreground" : ""}
-              >
-                30天
-              </TabsTrigger>
-            </TabsList>
+            <Tabs defaultValue={chartPeriod}>
+              <TabsList className="mt-2">
+                <TabsTrigger 
+                  value="daily"
+                  onClick={() => setChartPeriod('daily')}
+                >
+                  24小时
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="weekly"
+                  onClick={() => setChartPeriod('weekly')}
+                >
+                  7天
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="monthly"
+                  onClick={() => setChartPeriod('monthly')}
+                >
+                  30天
+                </TabsTrigger>
+              </TabsList>
+              {/* The TabsContent would normally go here, but it's not being used in this component */}
+            </Tabs>
           </CardHeader>
           <CardContent>
             <div className="h-[300px] w-full">
