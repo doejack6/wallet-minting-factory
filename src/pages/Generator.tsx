@@ -40,8 +40,9 @@ const Generator: React.FC = () => {
     setIsRunning(walletGenerator.isRunning());
     setConfig(walletGenerator.getConfig());
     
-    setSavedCount(walletDB.getTotalCount());
-    walletGenerator.setSavedCount(walletDB.getTotalCount());
+    const dbCount = walletDB.getTotalCount();
+    setSavedCount(dbCount);
+    walletGenerator.setSavedCount(dbCount);
     
     walletGenerator.setOnProgress((stats) => {
       setCurrentSpeed(stats.speed);
@@ -52,8 +53,10 @@ const Generator: React.FC = () => {
     const uiUpdateInterval = setInterval(() => {
       if (walletGenerator.isRunning()) {
         setElapsedTime(walletGenerator.getUptime());
-        const latestWallets = walletGenerator.getLastBatch(20);
-        setRecentWallets(latestWallets);
+        setRecentWallets(walletGenerator.getLastBatch(20));
+        
+        setSavedCount(walletDB.getTotalCount());
+        setGeneratedCount(walletGenerator.getTotalGenerated());
       }
     }, 1000);
     
@@ -63,7 +66,7 @@ const Generator: React.FC = () => {
         if (walletsToSave.length > 0) {
           walletDB.storeWallets(walletsToSave)
             .then(() => {
-              walletGenerator.incrementSavedCount(walletsToSave.length);
+              setSavedCount(walletDB.getTotalCount());
             })
             .catch(error => {
               console.error('Failed to save wallets to database', error);
@@ -77,9 +80,22 @@ const Generator: React.FC = () => {
       }
     }, saveFrequency);
     
+    const handleWalletsStored = (e: any) => {
+      setSavedCount(e.detail.total);
+    };
+    
+    const handleDatabaseCleared = () => {
+      setSavedCount(0);
+    };
+    
+    window.addEventListener('walletsStored', handleWalletsStored);
+    window.addEventListener('databaseCleared', handleDatabaseCleared);
+    
     return () => {
       clearInterval(uiUpdateInterval);
       clearInterval(dbSaveInterval);
+      window.removeEventListener('walletsStored', handleWalletsStored);
+      window.removeEventListener('databaseCleared', handleDatabaseCleared);
     };
   }, [autoSave, toast, saveFrequency]);
   

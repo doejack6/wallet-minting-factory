@@ -1,3 +1,4 @@
+
 import { WalletType, Wallet, GeneratorConfig } from './types';
 import { walletDB } from './database';
 
@@ -72,6 +73,7 @@ export class WalletGeneratorEngine {
   private lastSample = 0;
   private todayGenerated = 0;
   private onProgress: ((stats: { count: number, speed: number, savedCount: number }) => void) | null = null;
+  private syncInterval: number | null = null;
   
   // Advanced configuration options
   private config: GeneratorConfig = {
@@ -96,6 +98,17 @@ export class WalletGeneratorEngine {
       // Set up daily reset
       setInterval(() => this.resetDailyCount(), 24 * 60 * 60 * 1000);
     }, timeToMidnight);
+    
+    // Listen for database events
+    if (typeof window !== 'undefined') {
+      window.addEventListener('walletsStored', (e: any) => {
+        this.savedToDbCount = e.detail.total;
+      });
+      
+      window.addEventListener('databaseCleared', () => {
+        this.savedToDbCount = 0;
+      });
+    }
   }
   
   private resetDailyCount(): void {
@@ -137,11 +150,24 @@ export class WalletGeneratorEngine {
     // Ensure initial database sync when starting
     this.syncWithDatabase();
     
+    // Set up recurring database sync
+    if (this.syncInterval === null) {
+      this.syncInterval = window.setInterval(() => {
+        this.syncWithDatabase();
+      }, 5000); // Sync every 5 seconds
+    }
+    
     this.runGenerationCycle();
   }
   
   public stop(): void {
     this.running = false;
+    
+    // Clear sync interval
+    if (this.syncInterval !== null) {
+      clearInterval(this.syncInterval);
+      this.syncInterval = null;
+    }
   }
   
   public isRunning(): boolean {
@@ -179,12 +205,23 @@ export class WalletGeneratorEngine {
   
   private async syncWithDatabase() {
     // Periodically sync generated wallets with the database
-    const batchToSave = this.getLastBatch(1000);
-    try {
-      await walletDB.storeWallets(batchToSave);
-      this.setSavedCount(walletDB.getTotalCount());
-    } catch (error) {
-      console.error('Failed to sync wallets with database', error);
+    const batchToSave = this.getLastBatch(5000);
+    if (batchToSave.length > 0) {
+      try {
+        await walletDB.storeWallets(batchToSave);
+        this.savedToDbCount = walletDB.getTotalCount();
+        
+        // Notify progress
+        if (this.onProgress) {
+          this.onProgress({
+            count: this.generatedCount,
+            speed: this.generationSpeed,
+            savedCount: this.savedToDbCount
+          });
+        }
+      } catch (error) {
+        console.error('Failed to sync wallets with database', error);
+      }
     }
   }
   
@@ -193,7 +230,7 @@ export class WalletGeneratorEngine {
     
     // For demo purposes, we generate a smaller batch
     // In real implementation this would be done in a more efficient way
-    const batchSize = Math.min(this.config.batchSize, this.targetSpeed / 20);
+    const batchSize = Math.min(this.config.batchSize, Math.floor(this.targetSpeed / 20));
     
     // Calculate how many of each type to generate based on ratio
     const trc20Count = Math.round(batchSize * (this.config.trc20Ratio / 100));
@@ -203,11 +240,15 @@ export class WalletGeneratorEngine {
     const trc20Batch = generateWalletBatch(trc20Count, 'TRC20');
     const erc20Batch = generateWalletBatch(erc20Count, 'ERC20');
     
-    // Store for recent access (limited to 1000 most recent for demo)
-    this.wallets = [...this.wallets, ...trc20Batch, ...erc20Batch].slice(-1000);
+    // Combine the batches
+    const newBatch = [...trc20Batch, ...erc20Batch];
     
-    this.generatedCount += batchSize;
-    this.todayGenerated += batchSize;
+    // Store for recent access (limited to recent wallets for demo)
+    this.wallets = [...this.wallets, ...newBatch].slice(-1000);
+    
+    // Increment counters
+    this.generatedCount += newBatch.length;
+    this.todayGenerated += newBatch.length;
     
     // Calculate generation speed
     const now = Date.now();
@@ -226,11 +267,6 @@ export class WalletGeneratorEngine {
           savedCount: this.savedToDbCount
         });
       }
-    }
-    
-    // Add periodic database sync
-    if (this.generatedCount % 10000 === 0) {
-      this.syncWithDatabase();
     }
     
     // Schedule next cycle based on thread count (simulated)

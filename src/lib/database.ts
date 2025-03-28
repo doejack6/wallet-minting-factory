@@ -31,9 +31,13 @@ class WalletDatabase {
   }
   
   public async storeWallets(wallets: Wallet[]): Promise<void> {
+    if (!wallets || wallets.length === 0) return;
+    
     const uniqueWallets = wallets.filter(
       wallet => !this.wallets.some(existingWallet => existingWallet.address === wallet.address)
     );
+    
+    if (uniqueWallets.length === 0) return;
     
     this.wallets = [...this.wallets, ...uniqueWallets];
     this.lastWrite = new Date();
@@ -46,6 +50,14 @@ class WalletDatabase {
     if (elapsed >= 1) {
       this.writeSpeed = Math.round(uniqueWallets.length / elapsed);
       this.lastSpeedUpdate = now;
+      this.lastCount = this.wallets.length;
+    }
+    
+    // Notify external systems that new wallets have been stored
+    if (typeof window !== 'undefined' && window.dispatchEvent) {
+      window.dispatchEvent(new CustomEvent('walletsStored', { 
+        detail: { count: uniqueWallets.length, total: this.wallets.length }
+      }));
     }
   }
   
@@ -184,9 +196,9 @@ class WalletDatabase {
     this.wallets = [];
     this.lastWrite = new Date();
     
-    // Reset wallet generator saved count when database is cleared
-    if (walletGenerator) {
-      walletGenerator.setSavedCount(0);
+    // Notify that database was cleared using event system
+    if (typeof window !== 'undefined' && window.dispatchEvent) {
+      window.dispatchEvent(new CustomEvent('databaseCleared'));
     }
     
     await new Promise(resolve => setTimeout(resolve, 100));
