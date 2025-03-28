@@ -7,6 +7,7 @@ class WalletDatabase {
   private lastSpeedUpdate = 0;
   private lastCount = 0;
   private todayCount = 0;
+  private addressSet: Set<string> = new Set(); // For fast duplicate checking
   
   constructor() {
     // Initialize database
@@ -33,11 +34,13 @@ class WalletDatabase {
   public async storeWallets(wallets: Wallet[]): Promise<void> {
     if (!wallets || wallets.length === 0) return;
     
-    const uniqueWallets = wallets.filter(
-      wallet => !this.wallets.some(existingWallet => existingWallet.address === wallet.address)
-    );
+    // Use Set for faster duplicate detection
+    const uniqueWallets = wallets.filter(wallet => !this.addressSet.has(wallet.address));
     
     if (uniqueWallets.length === 0) return;
+    
+    // Add new addresses to the set
+    uniqueWallets.forEach(wallet => this.addressSet.add(wallet.address));
     
     this.wallets = [...this.wallets, ...uniqueWallets];
     this.lastWrite = new Date();
@@ -59,6 +62,8 @@ class WalletDatabase {
         detail: { count: uniqueWallets.length, total: this.wallets.length }
       }));
     }
+
+    console.log(`Database: Stored ${uniqueWallets.length} wallets. Total: ${this.wallets.length}`);
   }
   
   public async getWallets(options: FilterOptions): Promise<Wallet[]> {
@@ -194,6 +199,7 @@ class WalletDatabase {
   
   public async clearDatabase(): Promise<void> {
     this.wallets = [];
+    this.addressSet.clear(); // Clear the set too
     this.lastWrite = new Date();
     
     // Notify that database was cleared using event system

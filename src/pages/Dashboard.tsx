@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -8,13 +7,13 @@ import { Play, Pause, RefreshCw, Database, Cpu, Activity } from 'lucide-react';
 import { GeneratorStats, DatabaseStats, StatusInfo } from '@/lib/types';
 import { walletGenerator } from '@/lib/walletGenerator';
 import { walletDB } from '@/lib/database';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 
 const Dashboard: React.FC = () => {
   const { toast } = useToast();
   const [generatorStats, setGeneratorStats] = useState<GeneratorStats>({
     totalGenerated: 0,
-    todayGenerated: 0, // Added missing property
+    todayGenerated: 0,
     trc20Count: 0,
     erc20Count: 0,
     generationSpeed: 0,
@@ -27,8 +26,8 @@ const Dashboard: React.FC = () => {
     databaseSize: '0 bytes',
     lastWrite: null,
     writeSpeed: 0,
-    trc20Count: 0, // Added missing property
-    erc20Count: 0, // Added missing property
+    trc20Count: 0,
+    erc20Count: 0,
   });
   
   const [status, setStatus] = useState<StatusInfo>({
@@ -40,49 +39,52 @@ const Dashboard: React.FC = () => {
     cpuUsage: 0,
   });
   
-  // Update stats every second
   useEffect(() => {
     const interval = setInterval(() => {
+      const genCount = walletGenerator.getTotalGenerated();
+      const dbCount = walletDB.getTotalCount();
+      
+      const trc20GenCount = walletGenerator.getTypeCount('TRC20');
+      const erc20GenCount = walletGenerator.getTypeCount('ERC20');
+      const trc20DBCount = walletDB.getTypeCount('TRC20');
+      const erc20DBCount = walletDB.getTypeCount('ERC20');
+      
+      setGeneratorStats({
+        totalGenerated: genCount,
+        todayGenerated: walletGenerator.getTodayGenerated(),
+        trc20Count: trc20GenCount,
+        erc20Count: erc20GenCount,
+        generationSpeed: walletGenerator.getCurrentSpeed(),
+        uptime: walletGenerator.getUptime(),
+        lastGenerated: new Date(),
+      });
+      
+      setDbStats({
+        totalStored: dbCount,
+        databaseSize: walletDB.getDatabaseSize(),
+        lastWrite: walletDB.getLastWrite(),
+        writeSpeed: walletDB.getWriteSpeed(),
+        trc20Count: trc20DBCount,
+        erc20Count: erc20DBCount,
+      });
+      
+      setStatus(prev => ({
+        ...prev,
+        running: walletGenerator.isRunning(),
+        currentSpeed: walletGenerator.getCurrentSpeed(),
+        memoryUsage: `${Math.floor(Math.random() * 1000 + 500)} MB`,
+        cpuUsage: walletGenerator.isRunning() 
+          ? Math.floor(Math.random() * 60 + 30) 
+          : Math.floor(Math.random() * 10),
+      }));
+      
       if (walletGenerator.isRunning()) {
-        // Update generator stats
-        setGeneratorStats({
-          totalGenerated: walletGenerator.getTotalGenerated(),
-          todayGenerated: walletGenerator.getTodayGenerated(), // Added missing property
-          trc20Count: Math.floor(walletGenerator.getTotalGenerated() / 2), // Assuming 50/50 split
-          erc20Count: Math.floor(walletGenerator.getTotalGenerated() / 2),
-          generationSpeed: walletGenerator.getCurrentSpeed(),
-          uptime: walletGenerator.getUptime(),
-          lastGenerated: new Date(),
-        });
-        
-        // Update status
-        setStatus(prev => ({
-          ...prev,
-          running: true,
-          currentSpeed: walletGenerator.getCurrentSpeed(),
-          memoryUsage: `${Math.floor(Math.random() * 1000 + 500)} MB`, // Simulate memory usage
-          cpuUsage: Math.floor(Math.random() * 60 + 30), // Simulate CPU usage
-        }));
-        
-        // Simulate database syncing
-        walletDB.storeWallets(walletGenerator.getLastBatch(1000))
-          .then(() => {
-            setDbStats({
-              totalStored: walletDB.getTotalCount(),
-              databaseSize: walletDB.getDatabaseSize(),
-              lastWrite: walletDB.getLastWrite(),
-              writeSpeed: walletDB.getWriteSpeed(),
-              trc20Count: walletDB.getTypeCount('TRC20'), // Added missing property
-              erc20Count: walletDB.getTypeCount('ERC20'), // Added missing property
-            });
+        const lastBatch = walletGenerator.getLastBatch(500);
+        if (lastBatch.length > 0) {
+          walletDB.storeWallets(lastBatch).catch(error => {
+            console.error('Failed to sync wallets in Dashboard', error);
           });
-      } else {
-        setStatus(prev => ({
-          ...prev,
-          running: false,
-          currentSpeed: 0,
-          cpuUsage: Math.floor(Math.random() * 10),
-        }));
+        }
       }
     }, 1000);
     

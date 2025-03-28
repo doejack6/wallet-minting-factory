@@ -10,7 +10,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { walletGenerator } from '@/lib/walletGenerator';
 import { walletDB } from '@/lib/database';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
@@ -41,8 +41,10 @@ const Generator: React.FC = () => {
     setConfig(walletGenerator.getConfig());
     
     const dbCount = walletDB.getTotalCount();
+    const genCount = walletGenerator.getTotalGenerated();
+    
     setSavedCount(dbCount);
-    walletGenerator.setSavedCount(dbCount);
+    setGeneratedCount(genCount);
     
     walletGenerator.setOnProgress((stats) => {
       setCurrentSpeed(stats.speed);
@@ -99,20 +101,6 @@ const Generator: React.FC = () => {
     };
   }, [autoSave, toast, saveFrequency]);
   
-  useEffect(() => {
-    const updateStats = () => {
-      const totalGenerated = walletGenerator.getTotalGenerated();
-      const savedToDatabase = walletDB.getTotalCount();
-      
-      setGeneratedCount(totalGenerated);
-      setSavedCount(savedToDatabase);
-    };
-    
-    const interval = setInterval(updateStats, 1000);
-    
-    return () => clearInterval(interval);
-  }, []);
-
   const toggleGenerator = () => {
     if (isRunning) {
       walletGenerator.stop();
@@ -153,6 +141,7 @@ const Generator: React.FC = () => {
 
   const resetCounter = () => {
     if (!isRunning) {
+      walletGenerator.resetGeneratedCount();
       setGeneratedCount(0);
       setElapsedTime(0);
       toast({

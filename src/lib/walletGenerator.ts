@@ -67,6 +67,7 @@ export class WalletGeneratorEngine {
   private generationSpeed = 0;
   private targetSpeed = 100000; // Target 100k per second
   private generatedCount = 0;
+  private realGeneratedCount = 0; // Actual count for UI display
   private savedToDbCount = 0;
   private startTime: Date | null = null;
   private lastSpeedUpdate = 0;
@@ -74,6 +75,7 @@ export class WalletGeneratorEngine {
   private todayGenerated = 0;
   private onProgress: ((stats: { count: number, speed: number, savedCount: number }) => void) | null = null;
   private syncInterval: number | null = null;
+  private dbSyncInterval: number | null = null;
   
   // Advanced configuration options
   private config: GeneratorConfig = {
@@ -108,6 +110,18 @@ export class WalletGeneratorEngine {
       window.addEventListener('databaseCleared', () => {
         this.savedToDbCount = 0;
       });
+    }
+    
+    // Synchronize with database on initialization
+    this.synchronizeWithDatabase();
+  }
+  
+  private async synchronizeWithDatabase() {
+    try {
+      this.savedToDbCount = walletDB.getTotalCount();
+      console.log(`Generator: Synchronized with database. Total saved: ${this.savedToDbCount}`);
+    } catch (error) {
+      console.error('Failed to synchronize with database', error);
     }
   }
   
@@ -147,14 +161,21 @@ export class WalletGeneratorEngine {
     this.lastSpeedUpdate = Date.now();
     this.lastSample = this.generatedCount;
     
-    // Ensure initial database sync when starting
-    this.syncWithDatabase();
+    // Ensure we have correct database count before starting
+    this.synchronizeWithDatabase();
     
-    // Set up recurring database sync
+    // Set up recurring database sync at longer intervals
     if (this.syncInterval === null) {
       this.syncInterval = window.setInterval(() => {
+        this.synchronizeWithDatabase();
+      }, 10000); // Check every 10 seconds
+    }
+    
+    // Set up automatic sync to database at a reasonable interval to avoid too frequent syncing
+    if (this.dbSyncInterval === null) {
+      this.dbSyncInterval = window.setInterval(() => {
         this.syncWithDatabase();
-      }, 5000); // Sync every 5 seconds
+      }, 3000); // Sync every 3 seconds
     }
     
     this.runGenerationCycle();
@@ -163,10 +184,18 @@ export class WalletGeneratorEngine {
   public stop(): void {
     this.running = false;
     
-    // Clear sync interval
+    // Final sync before stopping
+    this.syncWithDatabase();
+    
+    // Clear sync intervals
     if (this.syncInterval !== null) {
       clearInterval(this.syncInterval);
       this.syncInterval = null;
+    }
+    
+    if (this.dbSyncInterval !== null) {
+      clearInterval(this.dbSyncInterval);
+      this.dbSyncInterval = null;
     }
   }
   
@@ -175,7 +204,7 @@ export class WalletGeneratorEngine {
   }
   
   public getTotalGenerated(): number {
-    return this.generatedCount;
+    return this.realGeneratedCount;
   }
   
   public getTodayGenerated(): number {
@@ -183,7 +212,12 @@ export class WalletGeneratorEngine {
   }
   
   public getTypeCount(type: WalletType): number {
-    return this.wallets.filter(wallet => wallet.type === type).length;
+    // Estimate based on ratio
+    if (type === 'TRC20') {
+      return Math.floor(this.realGeneratedCount * (this.config.trc20Ratio / 100));
+    } else {
+      return Math.floor(this.realGeneratedCount * ((100 - this.config.trc20Ratio) / 100));
+    }
   }
   
   public getUptime(): number {
@@ -203,18 +237,35 @@ export class WalletGeneratorEngine {
     return this.wallets.slice(-limit);
   }
   
+  public resetGeneratedCount(): void {
+    this.generatedCount = 0;
+    this.realGeneratedCount = 0;
+    this.todayGenerated = 0;
+  }
+  
   private async syncWithDatabase() {
-    // Periodically sync generated wallets with the database
-    const batchToSave = this.getLastBatch(5000);
+    // Only sync a limited number of wallets to database to maintain performance
+    if (!this.running) return;
+    
+    const batchToSave = this.getLastBatch(1000);
     if (batchToSave.length > 0) {
       try {
         await walletDB.storeWallets(batchToSave);
         this.savedToDbCount = walletDB.getTotalCount();
         
+        // Log the sync
+        console.log(`Generator: Synced ${batchToSave.length} wallets. DB count: ${this.savedToDbCount}`);
+        
+        // Adjust real generated count if needed to ensure it's always >= savedToDbCount
+        if (this.realGeneratedCount < this.savedToDbCount) {
+          this.realGeneratedCount = this.savedToDbCount;
+          console.log(`Generator: Adjusted generated count to ${this.realGeneratedCount}`);
+        }
+        
         // Notify progress
         if (this.onProgress) {
           this.onProgress({
-            count: this.generatedCount,
+            count: this.realGeneratedCount,
             speed: this.generationSpeed,
             savedCount: this.savedToDbCount
           });
@@ -248,6 +299,7 @@ export class WalletGeneratorEngine {
     
     // Increment counters
     this.generatedCount += newBatch.length;
+    this.realGeneratedCount += newBatch.length;
     this.todayGenerated += newBatch.length;
     
     // Calculate generation speed
@@ -262,7 +314,7 @@ export class WalletGeneratorEngine {
       // Notify progress
       if (this.onProgress) {
         this.onProgress({
-          count: this.generatedCount,
+          count: this.realGeneratedCount,
           speed: this.generationSpeed,
           savedCount: this.savedToDbCount
         });
