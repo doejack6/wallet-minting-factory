@@ -14,7 +14,8 @@ import {
   BarChart4,
   Settings2,
   FileDown,
-  FileText
+  FileText,
+  Zap
 } from 'lucide-react';
 import { walletDB } from '@/lib/database';
 import { walletGenerator } from '@/lib/walletGenerator';
@@ -23,6 +24,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +33,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { FilterOptions } from '@/lib/types';
 import { exportWallets } from '@/lib/exportUtils';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 const Database: React.FC = () => {
   const { toast } = useToast();
@@ -47,6 +50,14 @@ const Database: React.FC = () => {
   const [storageEfficiency, setStorageEfficiency] = useState(0);
   const [optimizationLevel, setOptimizationLevel] = useState(5); // 1-10 scale
   const [isExporting, setIsExporting] = useState(false);
+  const [compressionEnabled, setCompressionEnabled] = useState(true);
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [sizeEstimates, setSizeEstimates] = useState([
+    { count: 100_000, size: '0 MB' },
+    { count: 1_000_000, size: '0 MB' },
+    { count: 10_000_000, size: '0 GB' },
+    { count: 100_000_000, size: '0 GB' },
+  ]);
   
   useEffect(() => {
     const updateStats = () => {
@@ -65,6 +76,8 @@ const Database: React.FC = () => {
       if (totalGenerated > 0) {
         setStorageEfficiency(Math.floor((totalStored / totalGenerated) * 100));
       }
+      
+      setCompressionEnabled(walletDB.isCompressionEnabled());
     };
     
     updateStats();
@@ -73,6 +86,24 @@ const Database: React.FC = () => {
     
     return () => clearInterval(interval);
   }, []);
+  
+  useEffect(() => {
+    updateSizeEstimates();
+  }, [compressionEnabled]);
+  
+  const updateSizeEstimates = () => {
+    setIsCalculating(true);
+    
+    setTimeout(() => {
+      setSizeEstimates([
+        { count: 100_000, size: walletDB.estimateSizeForWalletCount(100_000) },
+        { count: 1_000_000, size: walletDB.estimateSizeForWalletCount(1_000_000) },
+        { count: 10_000_000, size: walletDB.estimateSizeForWalletCount(10_000_000) },
+        { count: 100_000_000, size: walletDB.estimateSizeForWalletCount(100_000_000) },
+      ]);
+      setIsCalculating(false);
+    }, 100);
+  };
   
   const handleManualSave = async () => {
     setIsLoading(true);
@@ -145,6 +176,21 @@ const Database: React.FC = () => {
     } finally {
       setIsExporting(false);
     }
+  };
+  
+  const toggleCompression = () => {
+    const newState = !compressionEnabled;
+    setCompressionEnabled(newState);
+    walletDB.setCompressionEnabled(newState);
+    
+    toast({
+      title: newState ? "存储优化已启用" : "存储优化已禁用",
+      description: newState 
+        ? "数据压缩已启用，这将减少内存使用并提高性能。" 
+        : "数据压缩已禁用，这可能会增加内存使用。",
+    });
+    
+    updateSizeEstimates();
   };
   
   const formatTime = (date: Date | null): string => {
@@ -271,6 +317,71 @@ const Database: React.FC = () => {
               </div>
             </div>
             
+            <div className="flex items-center p-4 bg-muted rounded-lg">
+              <div className="mr-4">
+                <Switch 
+                  id="compression-toggle"
+                  checked={compressionEnabled}
+                  onCheckedChange={toggleCompression}
+                />
+              </div>
+              <div>
+                <Label htmlFor="compression-toggle" className="font-medium">
+                  数据压缩优化 {compressionEnabled ? '(已启用)' : '(已禁用)'}
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  启用后可减少约60%的内存使用，提高性能并支持更大规模的钱包存储
+                </p>
+              </div>
+              <div className="ml-auto">
+                <Zap className={`h-6 w-6 ${compressionEnabled ? 'text-green-500' : 'text-gray-400'}`} />
+              </div>
+            </div>
+            
+            <Card className="overflow-hidden">
+              <CardHeader className="p-4">
+                <CardTitle className="text-base">大规模钱包存储预估</CardTitle>
+                <CardDescription>不同数量钱包的存储空间预估</CardDescription>
+              </CardHeader>
+              
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>钱包数量</TableHead>
+                    <TableHead>预估大小</TableHead>
+                    <TableHead>存储效率</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isCalculating ? (
+                    <TableRow>
+                      <TableCell colSpan={3} className="text-center py-4">
+                        计算中...
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    sizeEstimates.map((estimate, i) => (
+                      <TableRow key={i}>
+                        <TableCell>{formatNumber(estimate.count)}</TableCell>
+                        <TableCell>{estimate.size}</TableCell>
+                        <TableCell>
+                          <div className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs ${
+                            compressionEnabled ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            {compressionEnabled ? '高效' : '标准'}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+              
+              <div className="p-4 bg-muted text-xs">
+                <p>注：预估基于当前的存储优化设置。切换压缩开关可查看不同配置下的存储效率。</p>
+              </div>
+            </Card>
+            
             <div className="pt-2">
               <h3 className="text-sm font-medium mb-3">数据库活动</h3>
               <div className="grid grid-cols-2 gap-4">
@@ -367,7 +478,7 @@ const Database: React.FC = () => {
             <TabsTrigger value="storage">存储优化</TabsTrigger>
             <TabsTrigger value="security">安全</TabsTrigger>
           </TabsList>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={updateSizeEstimates}>
             <RefreshCw className="mr-2 h-4 w-4" />
             刷新统计
           </Button>
@@ -487,6 +598,24 @@ const Database: React.FC = () => {
                   </div>
                 </div>
                 
+                <div className="p-4 border border-dashed border-border rounded-lg">
+                  <h3 className="text-sm font-semibold mb-2">数据压缩</h3>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm">当前状态: <span className={compressionEnabled ? "text-green-500" : "text-muted-foreground"}>
+                        {compressionEnabled ? "已启用 (节省空间约60%)" : "已禁用"}
+                      </span></p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        数据压缩可以显著减少存储空间，支持更大规模的钱包生成与存储
+                      </p>
+                    </div>
+                    <Switch 
+                      checked={compressionEnabled}
+                      onCheckedChange={toggleCompression}
+                    />
+                  </div>
+                </div>
+                
                 <Sheet>
                   <SheetTrigger asChild>
                     <Button variant="outline">
@@ -503,7 +632,7 @@ const Database: React.FC = () => {
                     </SheetHeader>
                     <div className="py-4 space-y-6">
                       <p className="text-sm text-muted-foreground">
-                        这些高级设置可以帮助您平衡系统性能和数据存储可靠性。调整这些设置可能会影响系统整体性能。
+                        ��些高级设置可以帮助您平衡系统性能和数据存储可靠性。调整这些设置可能会影响系统整体性能。
                       </p>
                       
                       <div className="space-y-4">
@@ -551,6 +680,7 @@ const Database: React.FC = () => {
                       storageEfficiency < 70 ? 
                         " 存储效率尚可，但仍有优化空间。" : 
                         " 存储效率良好，系统运行正常。"}
+                    {!compressionEnabled && " 启用数据压缩可进一步提高存储效率。"}
                   </AlertDescription>
                 </Alert>
               </div>

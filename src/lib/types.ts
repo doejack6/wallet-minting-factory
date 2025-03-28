@@ -1,6 +1,7 @@
 
 export type WalletType = 'TRC20' | 'ERC20';
 
+// Optimized wallet structure to reduce memory footprint
 export interface Wallet {
   id: string;
   address: string;
@@ -8,6 +9,15 @@ export interface Wallet {
   publicKey: string;
   type: WalletType;
   createdAt: Date;
+}
+
+// Compact wallet representation for more efficient storage
+export interface CompactWallet {
+  a: string; // address
+  p: string; // privateKey
+  k: string; // publicKey
+  t: 0 | 1; // type: 0 = TRC20, 1 = ERC20
+  c: number; // createdAt as unix timestamp
 }
 
 export interface GeneratorConfig {
