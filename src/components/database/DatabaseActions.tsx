@@ -7,7 +7,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { FileDown, FileText, Save, Trash2 } from 'lucide-react';
+import { FileDown, FileText, Save, Trash2, Download } from 'lucide-react';
+import { backgroundGenerator } from '@/lib/services/backgroundGeneratorService';
 
 interface DatabaseActionsProps {
   isLoading: boolean;
@@ -26,6 +27,9 @@ const DatabaseActions: React.FC<DatabaseActionsProps> = ({
   onClearDatabase,
   onExport
 }) => {
+  const backgroundState = backgroundGenerator.getState();
+  const isBackgroundGenerating = backgroundState.isRunning;
+  
   return (
     <div className="space-x-2">
       <DropdownMenu>
@@ -56,6 +60,16 @@ const DatabaseActions: React.FC<DatabaseActionsProps> = ({
         <Save className="mr-2 h-4 w-4" />
         手动保存
       </Button>
+      {isBackgroundGenerating && (
+        <Button 
+          variant="outline" 
+          onClick={() => backgroundGenerator.stopGeneration()} 
+          className="bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+        >
+          <Download className="mr-2 h-4 w-4" />
+          导入后台数据
+        </Button>
+      )}
       <Button variant="destructive" onClick={onClearDatabase} disabled={isLoading}>
         <Trash2 className="mr-2 h-4 w-4" />
         清空数据库
