@@ -57,6 +57,8 @@ class BackgroundGeneratorService {
   private initWorker() {
     try {
       console.log('Creating wallet generator worker...');
+      
+      // Create worker with error handling
       this.worker = new Worker(new URL('../workers/walletGeneratorWorker.ts', import.meta.url), { type: 'module' });
       
       this.worker.addEventListener('message', this.handleWorkerMessage);
@@ -94,7 +96,7 @@ class BackgroundGeneratorService {
   private handleWorkerError = (event: ErrorEvent) => {
     console.error('Worker error:', event);
     this.updateState({
-      error: `钱包生成器工作线程错误: ${event.message}`
+      error: `钱包生成器工作线程错误: ${event.message || '未知错误'}`
     });
     
     // Attempt to restart the worker
