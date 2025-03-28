@@ -20,9 +20,9 @@ ARG SERVER_MEMORY_MB
 ENV SERVER_CPU_CORES=${SERVER_CPU_CORES:-16}
 ENV SERVER_MEMORY_MB=${SERVER_MEMORY_MB:-32768}
 
-# 运行环境检查脚本
+# 运行环境检查脚本 - 使用node执行而不是直接执行
 RUN chmod +x ./prebuild.js
-RUN ./prebuild.js
+RUN node ./prebuild.js
 
 # 注入服务器信息到前端
 RUN echo "// 服务器配置信息 - 构建于 $(date)" > ./public/server-config.js
