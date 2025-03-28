@@ -12,6 +12,7 @@ import Settings from "./pages/Settings";
 import Generator from "./pages/Generator";
 import Filter from "./pages/Filter";
 import Database from "./pages/Database";
+import PrivateKey from "./pages/PrivateKey";
 
 const queryClient = new QueryClient();
 
@@ -44,6 +45,14 @@ const App = () => (
             element={
               <AppLayout>
                 <Filter />
+              </AppLayout>
+            } 
+          />
+          <Route 
+            path="/privatekey/:id" 
+            element={
+              <AppLayout>
+                <PrivateKey />
               </AppLayout>
             } 
           />

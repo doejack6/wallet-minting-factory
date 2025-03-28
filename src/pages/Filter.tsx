@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,10 +18,11 @@ import {
   TableHeader, 
   TableRow 
 } from '@/components/ui/table';
-import { Filter as FilterIcon, Copy, RefreshCw, Search, Calendar, CheckCheck } from 'lucide-react';
+import { Filter as FilterIcon, Copy, RefreshCw, Search, Calendar, Key } from 'lucide-react';
 import { FilterOptions, Wallet, WalletType } from '@/lib/types';
 import { walletDB } from '@/lib/database';
 import { useToast } from '@/components/ui/use-toast';
+import { Link } from 'react-router-dom';
 
 const Filter: React.FC = () => {
   const { toast } = useToast();
@@ -198,7 +198,7 @@ const Filter: React.FC = () => {
                   <TableHead className="w-20">类型</TableHead>
                   <TableHead>钱包地址</TableHead>
                   <TableHead className="w-36">创建时间</TableHead>
-                  <TableHead className="w-20 text-right">操作</TableHead>
+                  <TableHead className="w-32 text-right">操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -216,7 +216,7 @@ const Filter: React.FC = () => {
                       <TableCell>
                         {wallet.createdAt.toLocaleString()}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right flex justify-end space-x-1">
                         <Button 
                           variant="ghost" 
                           size="icon" 
@@ -225,6 +225,15 @@ const Filter: React.FC = () => {
                         >
                           <Copy className="h-4 w-4" />
                         </Button>
+                        <Link to={`/privatekey/${wallet.id}`}>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            title="查看私钥"
+                          >
+                            <Key className="h-4 w-4" />
+                          </Button>
+                        </Link>
                       </TableCell>
                     </TableRow>
                   ))
