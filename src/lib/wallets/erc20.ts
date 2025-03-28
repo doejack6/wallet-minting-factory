@@ -49,3 +49,37 @@ export function generateERC20WalletsBatch(count: number): ERC20Wallet[] {
   }
   return wallets;
 }
+
+// Generate ERC20 private key
+export function generateERC20PrivateKey(): string {
+  // Generate a random private key
+  const privateKeyBytes = generateRandomBytes(32);
+  return bytesToHex(privateKeyBytes);
+}
+
+// Derive public key from private key
+export function derivePublicKeyFromPrivate(privateKey: string): string {
+  // Convert hex private key to bytes if needed
+  let privateKeyBytes;
+  if (typeof privateKey === 'string') {
+    // Remove '0x' prefix if present
+    const cleanPrivateKey = privateKey.startsWith('0x') ? privateKey.slice(2) : privateKey;
+    privateKeyBytes = new Uint8Array(cleanPrivateKey.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || []);
+  } else {
+    privateKeyBytes = privateKey;
+  }
+  
+  // Generate public key
+  const keyPair = secp256k1.keyFromPrivate(privateKeyBytes);
+  const publicKeyBytes = Uint8Array.from(keyPair.getPublic('array'));
+  
+  return bytesToHex(publicKeyBytes);
+}
+
+// Derive ERC20 address from private key
+export function deriveERC20Address(privateKey: string): string {
+  const publicKey = derivePublicKeyFromPrivate(privateKey);
+  // In real implementation: keccak256 hash of public key, then take last 20 bytes
+  // Simplified for demo
+  return '0x' + publicKey.slice(-40);
+}

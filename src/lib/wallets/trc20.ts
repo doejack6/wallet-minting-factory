@@ -42,3 +42,37 @@ export function generateTRC20WalletsBatch(count: number): TRC20Wallet[] {
   }
   return wallets;
 }
+
+// Generate TRC20 private key
+export function generateTRC20PrivateKey(): string {
+  // Generate a random private key
+  const privateKeyBytes = generateRandomBytes(32);
+  return bytesToHex(privateKeyBytes);
+}
+
+// Derive public key from private key
+export function derivePublicKeyFromPrivate(privateKey: string): string {
+  // Convert hex private key to bytes if needed
+  let privateKeyBytes;
+  if (typeof privateKey === 'string') {
+    // Remove '0x' prefix if present
+    const cleanPrivateKey = privateKey.startsWith('0x') ? privateKey.slice(2) : privateKey;
+    privateKeyBytes = new Uint8Array(cleanPrivateKey.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || []);
+  } else {
+    privateKeyBytes = privateKey;
+  }
+  
+  // Generate public key
+  const keyPair = secp256k1.keyFromPrivate(privateKeyBytes);
+  const publicKeyBytes = Uint8Array.from(keyPair.getPublic('array'));
+  
+  return bytesToHex(publicKeyBytes);
+}
+
+// Derive TRC20 address from private key
+export function deriveTRC20Address(privateKey: string): string {
+  const publicKey = derivePublicKeyFromPrivate(privateKey);
+  // In real implementation: sha256 of public key, then base58 encode
+  // Simplified for demo
+  return 'T' + publicKey.slice(-40);
+}
