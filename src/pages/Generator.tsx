@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { GeneratorConfig, Wallet } from '@/lib/types';
+import { Progress } from '@/components/ui/progress';
 
 const Generator: React.FC = () => {
   const { toast } = useToast();

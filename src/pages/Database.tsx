@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,6 +20,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const Database: React.FC = () => {
   const { toast } = useToast();
@@ -37,7 +37,6 @@ const Database: React.FC = () => {
   const [storageEfficiency, setStorageEfficiency] = useState(0);
   const [optimizationLevel, setOptimizationLevel] = useState(5); // 1-10 scale
   
-  // Update stats every second
   useEffect(() => {
     const updateStats = () => {
       const totalGenerated = walletGenerator.getTotalGenerated();
@@ -52,16 +51,13 @@ const Database: React.FC = () => {
         writeSpeed: walletDB.getWriteSpeed(),
       });
       
-      // Calculate storage efficiency
       if (totalGenerated > 0) {
         setStorageEfficiency(Math.floor((totalStored / totalGenerated) * 100));
       }
     };
     
-    // Initial update
     updateStats();
     
-    // Set interval
     const interval = setInterval(updateStats, 1000);
     
     return () => clearInterval(interval);
