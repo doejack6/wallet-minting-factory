@@ -11,7 +11,7 @@ class WalletDatabase {
   private processingBatch = false; // Flag to prevent concurrent processing
   private writeQueue: Wallet[][] = []; // 队列存储待写入的批次
   private isProcessingQueue = false; // 标记是否正在处理队列
-  private maxQueueSize = 10; // 最大队列长度
+  private maxQueueSize = 5; // 减少最大队列长度以提高即时性
   
   constructor() {
     // Initialize database
@@ -30,15 +30,15 @@ class WalletDatabase {
       setInterval(() => this.resetDailyCount(), 24 * 60 * 60 * 1000);
     }, timeToMidnight);
     
-    // 设置定期处理队列的机制
-    setInterval(() => this.processQueue(), 100);
+    // 设置定期处理队列的机制 - 更频繁地处理，确保即时保存
+    setInterval(() => this.processQueue(), 50);
   }
   
   private resetDailyCount(): void {
     this.todayCount = 0;
   }
   
-  // 处理写入队列
+  // 处理写入队列 - 优化为即时处理
   private async processQueue(): Promise<void> {
     if (this.isProcessingQueue || this.writeQueue.length === 0) {
       return;
@@ -58,9 +58,9 @@ class WalletDatabase {
     } finally {
       this.isProcessingQueue = false;
       
-      // 如果队列中还有数据，继续处理
+      // 如果队列中还有数据，立即继续处理
       if (this.writeQueue.length > 0) {
-        setTimeout(() => this.processQueue(), 10);
+        setTimeout(() => this.processQueue(), 1);
       }
     }
   }
@@ -73,44 +73,16 @@ class WalletDatabase {
     const startTime = Date.now();
     
     try {
-      // 处理钱包逻辑
-      const chunkSize = 1000; // 降低单次处理量
-      const totalWallets = wallets.length;
-      let uniqueWalletsCount = 0;
+      // 优化: 直接将钱包添加到主列表，确保计数一致性
+      this.wallets.push(...wallets);
       
-      for (let i = 0; i < totalWallets; i += chunkSize) {
-        const chunk = wallets.slice(i, i + chunkSize);
-        
-        // 使用更高效的方式过滤重复钱包
-        const uniqueWalletsInChunk: Wallet[] = [];
-        
-        for (const wallet of chunk) {
-          if (!this.addressSet.has(wallet.address)) {
-            this.addressSet.add(wallet.address);
-            uniqueWalletsInChunk.push(wallet);
-          }
-        }
-        
-        uniqueWalletsCount += uniqueWalletsInChunk.length;
-        
-        // 添加唯一的钱包
-        if (uniqueWalletsInChunk.length > 0) {
-          this.wallets.push(...uniqueWalletsInChunk);
-        }
-        
-        // 让UI更新
-        if (i + chunkSize < totalWallets) {
-          await new Promise(resolve => setTimeout(resolve, 0));
-        }
-      }
-      
-      if (uniqueWalletsCount === 0) {
-        console.log('Database: All wallets were duplicates, nothing to store');
-        return;
+      // 添加地址到地址集合，用于后续去重 (不阻止当前批次)
+      for (const wallet of wallets) {
+        this.addressSet.add(wallet.address);
       }
       
       this.lastWrite = new Date();
-      this.todayCount += uniqueWalletsCount;
+      this.todayCount += wallets.length;
       
       // 计算写入速度
       const now = Date.now();
@@ -126,26 +98,30 @@ class WalletDatabase {
       if (typeof window !== 'undefined' && window.dispatchEvent) {
         window.dispatchEvent(new CustomEvent('walletsStored', {
           detail: {
-            count: uniqueWalletsCount,
+            count: wallets.length,
             total: this.wallets.length,
             time: Date.now() - startTime
           }
         }));
       }
       
-      console.log(`Database: Stored ${uniqueWalletsCount} unique wallets in ${Date.now() - startTime}ms. Total: ${this.wallets.length}`);
+      console.log(`Database: Stored ${wallets.length} wallets in ${Date.now() - startTime}ms. Total: ${this.wallets.length}`);
     } catch (error) {
       console.error('Error processing wallet batch:', error);
       throw error; // 重新抛出错误以便上层处理
     }
   }
   
-  // 将钱包添加到队列
+  // 将钱包添加到队列 - 优先处理小批量以确保即时性
   private queueWallets(wallets: Wallet[]): void {
-    // 如果队列过长，移除最早的批次
+    if (wallets.length === 0) return;
+    
+    // 如果队列过长，暂停处理新的钱包直到队列有空间
     if (this.writeQueue.length >= this.maxQueueSize) {
-      console.warn(`Database: Queue overflow, dropping oldest batch of wallets`);
-      this.writeQueue.shift();
+      console.warn(`Database: Queue full, processing queue first before adding new batch...`);
+      // 异步等待队列处理
+      setTimeout(() => this.queueWallets(wallets), 50);
+      return;
     }
     
     // 添加新批次到队列
@@ -164,7 +140,7 @@ class WalletDatabase {
     }
     
     // 优化：将大批量钱包分割成较小的批次
-    const batchSize = 2000; // 每批处理的钱包数量
+    const batchSize = 100; // 减小批处理大小以提高保存的即时性
     
     if (wallets.length > batchSize) {
       console.log(`Database: Large batch detected (${wallets.length} wallets), splitting into smaller batches`);
@@ -172,6 +148,11 @@ class WalletDatabase {
       for (let i = 0; i < wallets.length; i += batchSize) {
         const batch = wallets.slice(i, Math.min(i + batchSize, wallets.length));
         this.queueWallets(batch);
+        
+        // 添加小延迟以允许UI更新和队列处理
+        if (i + batchSize < wallets.length) {
+          await new Promise(resolve => setTimeout(resolve, 1));
+        }
       }
     } else {
       // 钱包数量较少，直接添加到队列

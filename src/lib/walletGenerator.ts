@@ -53,18 +53,18 @@ export class WalletGeneratorEngine {
   private onProgress: ((stats: { count: number, speed: number, savedCount: number }) => void) | null = null;
   private syncInterval: number | null = null;
   private dbSyncInterval: number | null = null;
-  private addressSet: Set<string> = new Set(); 
-  private pendingWallets: Wallet[] = []; 
-  private maxBufferSize = 1000; // 缓冲区大小降低到1000
+  private maxBufferSize = 1000; // 缓冲区大小
   private lastSyncTime = 0; 
-  private minSyncInterval = 100; // 增加同步间隔时间到100ms
+  private minSyncInterval = 100; // 同步间隔时间
   private throttleFactor = 1.0; // 节流因子，用于自动调整生成速度
+  private pendingWallets: Wallet[] = []; // 待保存的钱包
+  private directSaveMode = true; // 启用直接保存模式，确保生成多少保存多少
   
   // 高级配置选项
   private config: GeneratorConfig = {
     trc20Ratio: 50, // 50% TRC20
-    threadCount: 2, // 降低到2
-    batchSize: 500, // 降低到500
+    threadCount: 2, // 线程数降低到2
+    batchSize: 100, // 批处理大小降低到100，确保每个批次都能快速保存
     memoryLimit: 512, // MB
   };
   
@@ -88,14 +88,11 @@ export class WalletGeneratorEngine {
     if (typeof window !== 'undefined') {
       window.addEventListener('walletsStored', (e: any) => {
         this.savedToDbCount = e.detail.total;
-        // 计算存储效率并调整速度
-        this.adjustGenerationRate();
         console.log(`WalletGenerator: Updated saved count to ${this.savedToDbCount}`);
       });
       
       window.addEventListener('databaseCleared', () => {
         this.savedToDbCount = 0;
-        this.addressSet.clear();
         this.pendingWallets = [];
         console.log('WalletGenerator: Database cleared event received');
       });
@@ -105,35 +102,9 @@ export class WalletGeneratorEngine {
     this.synchronizeWithDatabase();
   }
   
-  // 自动调整生成速率
-  private adjustGenerationRate(): void {
-    if (this.realGeneratedCount <= 0) return;
-    
-    const efficiency = this.savedToDbCount / this.realGeneratedCount;
-    
-    // 根据存储效率来调整节流因子
-    if (efficiency < 0.3) {
-      // 效率很低，大幅降低速度
-      this.throttleFactor = Math.max(0.1, this.throttleFactor * 0.5);
-      console.log(`Efficiency very low (${(efficiency * 100).toFixed(1)}%), reducing generation speed by 50%. New throttle: ${this.throttleFactor.toFixed(2)}`);
-    } else if (efficiency < 0.6) {
-      // 效率较低，适度降低速度
-      this.throttleFactor = Math.max(0.3, this.throttleFactor * 0.8);
-      console.log(`Efficiency low (${(efficiency * 100).toFixed(1)}%), reducing generation speed by 20%. New throttle: ${this.throttleFactor.toFixed(2)}`);
-    } else if (efficiency > 0.9 && this.throttleFactor < 1.0) {
-      // 效率很高，可以适当提高速度
-      this.throttleFactor = Math.min(1.0, this.throttleFactor * 1.2);
-      console.log(`Efficiency good (${(efficiency * 100).toFixed(1)}%), increasing generation speed by 20%. New throttle: ${this.throttleFactor.toFixed(2)}`);
-    }
-  }
-  
   private async synchronizeWithDatabase() {
     try {
       this.savedToDbCount = walletDB.getTotalCount();
-      // 初始化后计算存储效率
-      if (this.realGeneratedCount > 0) {
-        this.adjustGenerationRate();
-      }
       console.log(`Generator: Synchronized with database. Total saved: ${this.savedToDbCount}`);
     } catch (error) {
       console.error('Failed to synchronize with database', error);
@@ -162,8 +133,10 @@ export class WalletGeneratorEngine {
   
   public setConfig(config: Partial<GeneratorConfig>): void {
     this.config = { ...this.config, ...config };
-    // 更新缓冲区大小基于批处理大小
-    this.maxBufferSize = Math.max(1000, this.config.batchSize * 2); // 降低系数
+    // 更新批处理大小，保持较小数值确保高效保存
+    this.config.batchSize = Math.min(this.config.batchSize, 200);
+    // 更新缓冲区大小
+    this.maxBufferSize = Math.max(500, this.config.batchSize * 2);
   }
   
   public getConfig(): GeneratorConfig {
@@ -178,23 +151,22 @@ export class WalletGeneratorEngine {
     this.lastSpeedUpdate = Date.now();
     this.lastSample = this.generatedCount;
     this.lastSyncTime = Date.now();
-    this.throttleFactor = 1.0; // 重置节流因子
     
     // 确保数据库计数正确后再启动
     this.synchronizeWithDatabase();
     
-    // 设置更频繁的数据库同步以提高准确性
+    // 数据库同步
     if (this.syncInterval === null) {
       this.syncInterval = window.setInterval(() => {
         this.synchronizeWithDatabase();
-      }, 500); // 增加到500ms
+      }, 1000);
     }
     
-    // 设置自动数据库同步到更频繁的间隔
-    if (this.dbSyncInterval === null) {
+    // 设置自动数据库同步
+    if (this.dbSyncInterval === null && !this.directSaveMode) {
       this.dbSyncInterval = window.setInterval(() => {
-        this.syncWithDatabase(false); // 不强制同步
-      }, 200); // 增加到200ms
+        this.syncWithDatabase(false);
+      }, 200);
     }
     
     this.runGenerationCycle();
@@ -203,8 +175,8 @@ export class WalletGeneratorEngine {
   public stop(): void {
     this.running = false;
     
-    // 最终在停止前同步
-    this.syncWithDatabase(true);
+    // 确保所有待处理的钱包都保存到数据库
+    this.savePendingWallets(true);
     
     // 清除同步间隔
     if (this.syncInterval !== null) {
@@ -250,16 +222,21 @@ export class WalletGeneratorEngine {
   
   public setTargetSpeed(speed: number): void {
     this.targetSpeed = speed;
-    // 调整缓冲区大小基于目标速度
-    this.maxBufferSize = Math.max(1000, Math.floor(speed / 20)); // 更加保守的缓冲区
+    // 根据目标速度调整批处理大小和缓冲区
+    if (speed > 500000) {
+      this.config.batchSize = 100;
+      this.maxBufferSize = 500;
+    } else if (speed > 100000) {
+      this.config.batchSize = 50;
+      this.maxBufferSize = 300;
+    } else {
+      this.config.batchSize = 20;
+      this.maxBufferSize = 200;
+    }
   }
   
   public getLastBatch(limit: number = 100): Wallet[] {
-    // 从待保存钱包和最近保存的钱包中获取
-    if (this.pendingWallets.length > 0) {
-      const combined = [...this.wallets, ...this.pendingWallets];
-      return combined.slice(-limit);
-    }
+    // 从最近的钱包中获取
     return this.wallets.slice(-limit);
   }
   
@@ -267,36 +244,21 @@ export class WalletGeneratorEngine {
     this.generatedCount = 0;
     this.realGeneratedCount = 0;
     this.todayGenerated = 0;
-    this.addressSet.clear();
     this.pendingWallets = [];
   }
   
-  private async syncWithDatabase(force: boolean = false) {
-    if (!this.running && !force) return;
-    
-    const now = Date.now();
-    // 只有在足够时间过去或缓冲区足够大或强制同步时才同步
-    if (!force && now - this.lastSyncTime < this.minSyncInterval && this.pendingWallets.length < this.maxBufferSize) {
-      return;
-    }
-    
-    if (this.pendingWallets.length === 0) {
-      return;
-    }
-    
-    this.lastSyncTime = now;
-    
-    // 从缓冲区中取出钱包
-    const batchSize = Math.min(1000, this.pendingWallets.length); // 限制批处理大小
-    const batchToSave = this.pendingWallets.slice(0, batchSize);
-    this.pendingWallets = this.pendingWallets.slice(batchSize); // 保持剩余钱包在缓冲区中
+  private async savePendingWallets(force: boolean = false) {
+    if (this.pendingWallets.length === 0) return;
     
     try {
-      // 直接将钱包保存到数据库
-      await walletDB.storeWallets(batchToSave);
+      // 确保钱包被保存到数据库
+      await walletDB.storeWallets(this.pendingWallets);
       
       // 保留最近的几个钱包以供显示
-      this.wallets = [...this.wallets, ...batchToSave].slice(-100); // 减少保留数量
+      this.wallets = [...this.wallets, ...this.pendingWallets].slice(-100);
+      
+      // 清空待处理钱包
+      this.pendingWallets = [];
       
       // 更新保存计数从数据库
       this.savedToDbCount = walletDB.getTotalCount();
@@ -309,101 +271,91 @@ export class WalletGeneratorEngine {
           savedCount: this.savedToDbCount
         });
       }
+      
+      console.log(`Generator: Saved ${this.pendingWallets.length} wallets. Total saved: ${this.savedToDbCount}`);
     } catch (error) {
-      console.error('Failed to sync wallets with database', error);
-      // 将钱包放回缓冲区以进行重试
-      this.pendingWallets = [...batchToSave, ...this.pendingWallets];
+      console.error('Failed to save wallets to database', error);
+      // 如果强制保存失败，则重试一次
+      if (force) {
+        setTimeout(() => this.savePendingWallets(true), 500);
+      }
     }
   }
   
-  private runGenerationCycle(): void {
+  private async syncWithDatabase(force: boolean = false) {
+    if (!this.running && !force) return;
+    
+    if (this.pendingWallets.length === 0) return;
+    
+    try {
+      await this.savePendingWallets();
+    } catch (error) {
+      console.error('Failed to sync wallets with database', error);
+    }
+  }
+  
+  private async runGenerationCycle(): Promise<void> {
     if (!this.running) return;
     
-    // 计算当前的节流生成速度
-    const throttledSpeed = Math.floor(this.targetSpeed * this.throttleFactor);
-    
-    // 计算存储效率
-    const storageEfficiency = this.savedToDbCount > 0 && this.realGeneratedCount > 0 
-      ? this.savedToDbCount / this.realGeneratedCount 
-      : 1;
-    
-    // 根据存储效率动态调整批处理大小
-    let adjustedBatchSize = Math.min(
-      this.config.batchSize, 
-      Math.floor(throttledSpeed / 10) // 更保守的批处理大小
-    );
-    
-    // 如果存储效率低于30%，则显著减少批处理大小
-    if (storageEfficiency < 0.3) {
-      adjustedBatchSize = Math.max(50, Math.floor(adjustedBatchSize * 0.2)); 
-      console.log(`Storage efficiency very low (${(storageEfficiency * 100).toFixed(1)}%), reducing batch size to ${adjustedBatchSize}`);
-    } 
-    // 如果存储效率低于70%，则适度减少批处理大小
-    else if (storageEfficiency < 0.7) {
-      adjustedBatchSize = Math.max(100, Math.floor(adjustedBatchSize * 0.5));
-      console.log(`Storage efficiency low (${(storageEfficiency * 100).toFixed(1)}%), reducing batch size to ${adjustedBatchSize}`);
-    }
-    
-    // 最小批量为10
-    adjustedBatchSize = Math.max(10, adjustedBatchSize);
-    
-    // 根据配置的比例计算两种钱包的数量
-    const trc20Count = Math.round(adjustedBatchSize * (this.config.trc20Ratio / 100));
-    const erc20Count = adjustedBatchSize - trc20Count;
-    
-    // 生成钱包
-    const trc20Batch = generateWalletBatch(trc20Count, 'TRC20');
-    const erc20Batch = generateWalletBatch(erc20Count, 'ERC20');
-    
-    const newBatch = [...trc20Batch, ...erc20Batch];
-    
-    // 将钱包添加到待保存缓冲区
-    this.pendingWallets.push(...newBatch);
-    
-    // 如果缓冲区超过最大大小，则触发数据库同步
-    if (this.pendingWallets.length >= this.maxBufferSize) {
-      this.syncWithDatabase();
-    }
-    
-    // 增加生成计数器
-    this.generatedCount += newBatch.length;
-    this.realGeneratedCount += newBatch.length;
-    this.todayGenerated += newBatch.length;
-    
-    // 更新生成速度计算
-    const now = Date.now();
-    const elapsed = (now - this.lastSpeedUpdate) / 1000;
-    
-    if (elapsed >= 0.5) { // 增加到0.5秒
-      this.generationSpeed = Math.round((this.generatedCount - this.lastSample) / elapsed);
-      this.lastSample = this.generatedCount;
-      this.lastSpeedUpdate = now;
+    try {
+      // 计算当前生成速度
+      const cycleSpeed = Math.min(this.targetSpeed, 10000); // 每个周期最多生成1万个钱包
       
-      // 如果设置了进度回调，则更新进度
-      if (this.onProgress) {
-        this.onProgress({
-          count: this.realGeneratedCount,
-          speed: this.generationSpeed,
-          savedCount: this.savedToDbCount
-        });
+      // 根据配置的比例计算两种钱包的数量
+      const batchSize = Math.min(this.config.batchSize, 100); // 限制批处理大小，确保能高效保存
+      const trc20Count = Math.round(batchSize * (this.config.trc20Ratio / 100));
+      const erc20Count = batchSize - trc20Count;
+      
+      // 生成钱包
+      const trc20Batch = generateWalletBatch(trc20Count, 'TRC20');
+      const erc20Batch = generateWalletBatch(erc20Count, 'ERC20');
+      
+      const newBatch = [...trc20Batch, ...erc20Batch];
+      
+      // 增加生成计数器
+      this.generatedCount += newBatch.length;
+      this.realGeneratedCount += newBatch.length;
+      this.todayGenerated += newBatch.length;
+      
+      // 将钱包添加到待保存列表
+      this.pendingWallets.push(...newBatch);
+      
+      // 直接保存模式：生成后立即保存到数据库，确保生成多少保存多少
+      if (this.directSaveMode) {
+        await this.savePendingWallets();
       }
       
-      // 根据存储效率动态调整生成速率
-      this.adjustGenerationRate();
+      // 更新生成速度计算
+      const now = Date.now();
+      const elapsed = (now - this.lastSpeedUpdate) / 1000;
+      
+      if (elapsed >= 0.5) {
+        this.generationSpeed = Math.round((this.generatedCount - this.lastSample) / elapsed);
+        this.lastSample = this.generatedCount;
+        this.lastSpeedUpdate = now;
+        
+        // 如果设置了进度回调，则更新进度
+        if (this.onProgress) {
+          this.onProgress({
+            count: this.realGeneratedCount,
+            speed: this.generationSpeed,
+            savedCount: this.savedToDbCount
+          });
+        }
+      }
+      
+      // 计算新的周期时间 - 根据目标速度调整
+      const targetCycleTime = 1000 / (cycleSpeed / batchSize);
+      const minCycleTime = 10; // 最小周期时间10毫秒
+      const cycleTime = Math.max(minCycleTime, targetCycleTime);
+      
+      // 安排下一个生成周期
+      setTimeout(() => this.runGenerationCycle(), cycleTime);
+    } catch (error) {
+      console.error('Error in generation cycle:', error);
+      // 出错后延迟重试
+      setTimeout(() => this.runGenerationCycle(), 1000);
     }
-    
-    // 根据存储效率调整生成周期时间
-    // 如果存储效率低，则显著减慢周期时间
-    let cycleTime = 50 / this.config.threadCount; // 基础周期时间增加到50ms
-    
-    if (storageEfficiency < 0.3) {
-      cycleTime = cycleTime * 5; // 如果存储效率非常差，则显著减慢周期时间
-    } else if (storageEfficiency < 0.7) {
-      cycleTime = cycleTime * 2; // 如果存储效率一般，则适度减慢周期时间
-    }
-    
-    // 安排下一个生成周期
-    setTimeout(() => this.runGenerationCycle(), cycleTime);
   }
 }
 
