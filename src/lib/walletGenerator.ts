@@ -1,197 +1,21 @@
-
 import { Wallet, WalletType, GeneratorConfig } from './types';
 import { walletDB } from './database';
-import * as CryptoJS from 'crypto-js';
+import { generateTRC20PrivateKey, deriveTRC20Address, derivePublicKeyFromPrivate as deriveTRC20PublicKey } from './wallets/trc20';
+import { generateERC20PrivateKey, deriveERC20Address, derivePublicKeyFromPrivate as deriveERC20PublicKey } from './wallets/erc20';
 
-// Enhanced cryptographically secure random number generation
-function generateRandomBytes(length: number): Uint8Array {
-  const bytes = new Uint8Array(length);
-  
-  if (typeof window !== 'undefined' && window.crypto) {
-    window.crypto.getRandomValues(bytes);
-  } else {
-    // Fallback for environments without crypto API
-    for (let i = 0; i < length; i++) {
-      bytes[i] = Math.floor(Math.random() * 256);
-    }
-  }
-  
-  return bytes;
-}
-
-// Convert bytes to hex string
-function bytesToHex(bytes: Uint8Array): string {
-  return Array.from(bytes)
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-}
-
-// Generate random hex string with specified length
-function generateRandomHex(length: number): string {
-  const byteLength = Math.ceil(length / 2);
-  const bytes = generateRandomBytes(byteLength);
-  return bytesToHex(bytes).slice(0, length);
-}
-
-// Base58 encoding for TRC20 addresses
-const BASE58_CHARS = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-function base58Encode(data: Uint8Array): string {
-  let result = '';
-  let value = 0;
-  let j = 0;
-  
-  for (let i = 0; i < data.length; i++) {
-    for (let x = 0; x < 8; x++) {
-      value = ((value << 1) | ((data[i] >> (7 - x)) & 1));
-      j++;
-      if (j % 6 === 0) {
-        result += BASE58_CHARS[value];
-        value = 0;
-      }
-    }
-  }
-  
-  if (j % 6 !== 0) {
-    value <<= (6 - (j % 6));
-    result += BASE58_CHARS[value];
-  }
-  
-  return result;
-}
-
-// Generate a TRC20 private key
-function generateTRC20PrivateKey(): string {
-  // Generate 32 bytes (64 hex chars) of randomness
-  const bytes = generateRandomBytes(32);
-  
-  // Ensure the private key is in the valid range for ECDSA
-  bytes[0] = bytes[0] & 0x7F; // Clear the highest bit of the first byte
-  
-  return bytesToHex(bytes);
-}
-
-// Generate an ERC20 private key - 64 hex chars (32 bytes)
-function generateERC20PrivateKey(): string {
-  const bytes = generateRandomBytes(32);
-  return bytesToHex(bytes);
-}
-
-// Simplified SHA256 for demonstration purposes (using CryptoJS)
-function sha256(hexString: string): string {
-  const wordArray = CryptoJS.enc.Hex.parse(hexString);
-  const hash = CryptoJS.SHA256(wordArray);
-  return hash.toString(CryptoJS.enc.Hex);
-}
-
-// Keccak256 hash function for Ethereum addresses
-function keccak256(hexString: string): string {
-  const wordArray = CryptoJS.enc.Hex.parse(hexString);
-  const hash = CryptoJS.SHA3(wordArray, { outputLength: 256 });
-  return hash.toString(CryptoJS.enc.Hex);
-}
-
-// Improved TRON address derivation that better matches wallet behavior
-function deriveTRC20Address(privateKey: string): string {
-  // In a real implementation:
-  // 1. Derive public key from private key using secp256k1 curve
-  // 2. Calculate keccak256 hash of the public key
-  // 3. Take the last 20 bytes and convert to TRON format with base58
-  
-  // For this simulation, we need a more accurate representation
-  // We'll use a deterministic but more realistic approach
-  
-  // Use both SHA256 and keccak256 for a more unique hash
-  const hash = keccak256(sha256(privateKey) + privateKey);
-  const addressHex = hash.substring(hash.length - 40); // Take last 20 bytes (40 chars)
-  
-  // Add 41 prefix (TRON's network ID in hex)
-  const addressWithPrefix = "41" + addressHex;
-  
-  // Convert hex to byte array
-  const bytes = new Uint8Array(21);
-  for (let i = 0; i < addressWithPrefix.length / 2; i++) {
-    bytes[i] = parseInt(addressWithPrefix.substring(i * 2, i * 2 + 2), 16);
-  }
-  
-  // Calculate double SHA256 checksum
-  const checksum = doubleHash(bytes.slice(0, 21)).slice(0, 4);
-  
-  // Combine address bytes and checksum
-  const combined = new Uint8Array(25);
-  combined.set(bytes.slice(0, 21));
-  combined.set(checksum, 21);
-  
-  // Convert to base58
-  return base58TRONEncode(combined);
-}
-
-// Double SHA256 hash
-function doubleHash(bytes: Uint8Array): Uint8Array {
-  const firstHash = CryptoJS.SHA256(CryptoJS.lib.WordArray.create(bytes as any));
-  const secondHash = CryptoJS.SHA256(firstHash);
-  const hexStr = secondHash.toString(CryptoJS.enc.Hex);
-  
-  const result = new Uint8Array(32);
-  for (let i = 0; i < 32; i++) {
-    result[i] = parseInt(hexStr.substr(i * 2, 2), 16);
-  }
-  
-  return result;
-}
-
-// Base58 encoding specifically for TRON addresses
-function base58TRONEncode(bytes: Uint8Array): string {
-  const BASE58_CHARS = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-  let result = "";
-  let value = 0;
-  let i = 0;
-  
-  // Use BigInt for dealing with large numbers
-  let intValue = BigInt(0);
-  for (i = 0; i < bytes.length; i++) {
-    intValue = intValue * BigInt(256) + BigInt(bytes[i]);
-  }
-  
-  while (intValue > BigInt(0)) {
-    const remainder = Number(intValue % BigInt(58));
-    intValue = intValue / BigInt(58);
-    result = BASE58_CHARS[remainder] + result;
-  }
-  
-  // Leading zeros become '1'
-  for (i = 0; i < bytes.length && bytes[i] === 0; i++) {
-    result = '1' + result;
-  }
-  
-  return result;
-}
-
-// Generate ERC20 address from private key (simplified implementation)
-function deriveERC20Address(privateKey: string): string {
-  // In a real implementation:
-  // 1. Derive public key from private key using secp256k1 curve
-  // 2. Take keccak256 hash of the public key
-  // 3. Take the last 20 bytes (40 hex chars) and add 0x prefix
-  
-  // Simplified version for demonstration
-  const hash = keccak256(privateKey);
-  return '0x' + hash.substring(hash.length - 40);
-}
-
-// Generate a public key (in a real app, this would be derived from the private key)
-function derivePublicKey(privateKey: string): string {
-  // For this simulation, we're creating a deterministic but randomized public key
-  // based on the private key to ensure consistency
-  const hash1 = sha256(privateKey);
-  const hash2 = sha256(hash1 + privateKey);
-  return hash1 + hash2.substring(0, 128 - hash1.length);
-}
-
-// Generate a single wallet with proper cryptographic derivation
+// 生成单个钱包
 export function generateWallet(type: WalletType): Wallet {
-  const privateKey = type === 'TRC20' ? generateTRC20PrivateKey() : generateERC20PrivateKey();
-  const publicKey = derivePublicKey(privateKey);
-  const address = type === 'TRC20' ? deriveTRC20Address(privateKey) : deriveERC20Address(privateKey);
+  let privateKey, publicKey, address;
+  
+  if (type === 'TRC20') {
+    privateKey = generateTRC20PrivateKey();
+    publicKey = deriveTRC20PublicKey(privateKey);
+    address = deriveTRC20Address(privateKey);
+  } else {
+    privateKey = generateERC20PrivateKey();
+    publicKey = deriveERC20PublicKey(privateKey);
+    address = deriveERC20Address(privateKey);
+  }
   
   return {
     id: crypto.randomUUID(),
@@ -203,7 +27,7 @@ export function generateWallet(type: WalletType): Wallet {
   };
 }
 
-// Generate multiple wallets in batch
+// 批量生成多个钱包
 export function generateWalletBatch(count: number, type: WalletType): Wallet[] {
   const wallets: Wallet[] = [];
   for (let i = 0; i < count; i++) {
@@ -212,14 +36,14 @@ export function generateWalletBatch(count: number, type: WalletType): Wallet[] {
   return wallets;
 }
 
-// In a real application, this would be a proper multi-threaded or WebWorker implementation
+// 钱包生成引擎类
 export class WalletGeneratorEngine {
   private running = false;
   private wallets: Wallet[] = [];
   private generationSpeed = 0;
-  private targetSpeed = 100000; // Target 100k per second
+  private targetSpeed = 100000; // 目标10万每秒
   private generatedCount = 0;
-  private realGeneratedCount = 0; // Actual count for UI display
+  private realGeneratedCount = 0; // UI显示的实际计数
   private savedToDbCount = 0;
   private startTime: Date | null = null;
   private lastSpeedUpdate = 0;
@@ -228,13 +52,13 @@ export class WalletGeneratorEngine {
   private onProgress: ((stats: { count: number, speed: number, savedCount: number }) => void) | null = null;
   private syncInterval: number | null = null;
   private dbSyncInterval: number | null = null;
-  private addressSet: Set<string> = new Set(); // For tracking unique addresses
-  private pendingWallets: Wallet[] = []; // Buffer for wallets pending to be saved
-  private maxBufferSize = 10000; // Maximum buffer size before syncing with database
-  private lastSyncTime = 0; // Last time synced with database
-  private minSyncInterval = 25; // Minimum time (ms) between database syncs (reduced from 50ms)
+  private addressSet: Set<string> = new Set(); // 用于跟踪唯一地址
+  private pendingWallets: Wallet[] = []; // 待保存钱包的缓冲区
+  private maxBufferSize = 10000; // 与数据库同步前的最大缓冲区大小
+  private lastSyncTime = 0; // 上次与数据库同步的时间
+  private minSyncInterval = 25; // 数据库同步之间的最小时间(毫秒)
   
-  // Advanced configuration options
+  // 高级配置选项
   private config: GeneratorConfig = {
     trc20Ratio: 50, // 50% TRC20
     threadCount: 4,
@@ -243,10 +67,10 @@ export class WalletGeneratorEngine {
   };
   
   constructor() {
-    // Initialize engine
+    // 初始化引擎
     this.resetDailyCount();
     
-    // Reset today's count at midnight
+    // 重置今天计数器
     const now = new Date();
     const midnight = new Date(now);
     midnight.setHours(24, 0, 0, 0);
@@ -254,11 +78,11 @@ export class WalletGeneratorEngine {
     
     setTimeout(() => {
       this.resetDailyCount();
-      // Set up daily reset
+      // 设置每日重置
       setInterval(() => this.resetDailyCount(), 24 * 60 * 60 * 1000);
     }, timeToMidnight);
     
-    // Listen for database events
+    // 监听数据库事件
     if (typeof window !== 'undefined') {
       window.addEventListener('walletsStored', (e: any) => {
         this.savedToDbCount = e.detail.total;
@@ -273,7 +97,7 @@ export class WalletGeneratorEngine {
       });
     }
     
-    // Synchronize with database on initialization
+    // 初始化与数据库同步
     this.synchronizeWithDatabase();
   }
   
@@ -308,7 +132,7 @@ export class WalletGeneratorEngine {
   
   public setConfig(config: Partial<GeneratorConfig>): void {
     this.config = { ...this.config, ...config };
-    // Update buffer size based on batch size
+    // 更新缓冲区大小基于批处理大小
     this.maxBufferSize = Math.max(10000, this.config.batchSize * 10);
   }
   
@@ -325,21 +149,21 @@ export class WalletGeneratorEngine {
     this.lastSample = this.generatedCount;
     this.lastSyncTime = Date.now();
     
-    // Ensure we have correct database count before starting
+    // 确保数据库计数正确后再启动
     this.synchronizeWithDatabase();
     
-    // Set up recurring database sync at shorter intervals for more accuracy
+    // 设置更频繁的数据库同步以提高准确性
     if (this.syncInterval === null) {
       this.syncInterval = window.setInterval(() => {
         this.synchronizeWithDatabase();
-      }, 75); // Check every 75ms (reduced from 100ms)
+      }, 75); // 每75ms检查一次（减少为100ms）
     }
     
-    // Set up automatic sync to database at a shorter interval
+    // 设置自动数据库同步到更频繁的间隔
     if (this.dbSyncInterval === null) {
       this.dbSyncInterval = window.setInterval(() => {
-        this.syncWithDatabase(true); // Force sync
-      }, 25); // Sync every 25ms (reduced from 50ms)
+        this.syncWithDatabase(true); // 强制同步
+      }, 25); // 每25ms同步一次（减少为50ms）
     }
     
     this.runGenerationCycle();
@@ -348,10 +172,10 @@ export class WalletGeneratorEngine {
   public stop(): void {
     this.running = false;
     
-    // Final sync before stopping
+    // 最终在停止前同步
     this.syncWithDatabase(true);
     
-    // Clear sync intervals
+    // 清除同步间隔
     if (this.syncInterval !== null) {
       clearInterval(this.syncInterval);
       this.syncInterval = null;
@@ -376,7 +200,7 @@ export class WalletGeneratorEngine {
   }
   
   public getTypeCount(type: WalletType): number {
-    // Estimate based on ratio
+    // 估计基于比率
     if (type === 'TRC20') {
       return Math.floor(this.realGeneratedCount * (this.config.trc20Ratio / 100));
     } else {
@@ -395,12 +219,12 @@ export class WalletGeneratorEngine {
   
   public setTargetSpeed(speed: number): void {
     this.targetSpeed = speed;
-    // Adjust max buffer size based on target speed
-    this.maxBufferSize = Math.max(10000, Math.floor(speed / 8)); // More aggressive buffer (changed from /10)
+    // 调整缓冲区大小基于目标速度
+    this.maxBufferSize = Math.max(10000, Math.floor(speed / 8)); // 更加激进的缓冲区（从/10改为/8）
   }
   
   public getLastBatch(limit: number = 100): Wallet[] {
-    // Return from both pending wallets and recently saved wallets
+    // 从待保存钱包和最近保存的钱包中获取
     if (this.pendingWallets.length > 0) {
       const combined = [...this.wallets, ...this.pendingWallets];
       return combined.slice(-limit);
@@ -420,7 +244,7 @@ export class WalletGeneratorEngine {
     if (!this.running && !force) return;
     
     const now = Date.now();
-    // Only sync if enough time has passed or buffer is large enough or force sync
+    // 只有在足够时间过去或缓冲区足够大或强制同步时才同步
     if (!force && now - this.lastSyncTime < this.minSyncInterval && this.pendingWallets.length < this.maxBufferSize) {
       return;
     }
@@ -431,22 +255,22 @@ export class WalletGeneratorEngine {
     
     this.lastSyncTime = now;
     
-    // Take wallets from pending buffer
-    const batchSize = Math.min(10000, this.pendingWallets.length); // Limit batch size for better performance
+    // 从缓冲区中取出钱包
+    const batchSize = Math.min(10000, this.pendingWallets.length); // 限制批处理大小以提高性能
     const batchToSave = this.pendingWallets.slice(0, batchSize);
-    this.pendingWallets = this.pendingWallets.slice(batchSize); // Keep remaining wallets in buffer
+    this.pendingWallets = this.pendingWallets.slice(batchSize); // 保持剩余钱包在缓冲区中
     
     try {
-      // Save the wallets to the database directly
+      // 直接将钱包保存到数据库
       await walletDB.storeWallets(batchToSave);
       
-      // Keep a sliding window of recent wallets for display
+      // 保留最近的几个钱包以供显示
       this.wallets = [...this.wallets, ...batchToSave].slice(-1000);
       
-      // Update saved count from database
+      // 更新保存计数从数据库
       this.savedToDbCount = walletDB.getTotalCount();
       
-      // Update progress if callback is set
+      // 如果设置了进度回调，则更新进度
       if (this.onProgress) {
         this.onProgress({
           count: this.realGeneratedCount,
@@ -456,7 +280,7 @@ export class WalletGeneratorEngine {
       }
     } catch (error) {
       console.error('Failed to sync wallets with database', error);
-      // Put wallets back into pending buffer for retry
+      // 将钱包放回缓冲区以进行重试
       this.pendingWallets = [...batchToSave, ...this.pendingWallets];
     }
   }
@@ -464,20 +288,20 @@ export class WalletGeneratorEngine {
   private runGenerationCycle(): void {
     if (!this.running) return;
     
-    // Calculate storage efficiency
+    // 计算存储效率
     const storageEfficiency = this.savedToDbCount > 0 && this.realGeneratedCount > 0 
       ? this.savedToDbCount / this.realGeneratedCount 
       : 1;
     
-    // If storage efficiency is low, reduce batch size to allow database to catch up
+    // 如果存储效率低，则减少批处理大小以允许数据库赶上
     let adjustedBatchSize = Math.min(
       this.config.batchSize, 
       Math.floor(this.targetSpeed / 20)
     );
     
-    // If storage efficiency is below 50%, reduce batch size proportionally
+    // 如果存储效率低于50%，则按比例减少批处理大小
     if (storageEfficiency < 0.5) {
-      adjustedBatchSize = Math.max(100, Math.floor(adjustedBatchSize * storageEfficiency * 2.5)); // Increased multiplier (2 -> 2.5)
+      adjustedBatchSize = Math.max(100, Math.floor(adjustedBatchSize * storageEfficiency * 2.5)); // 增加乘数（2 -> 2.5）
     }
     
     const trc20Count = Math.round(adjustedBatchSize * (this.config.trc20Ratio / 100));
@@ -488,29 +312,29 @@ export class WalletGeneratorEngine {
     
     const newBatch = [...trc20Batch, ...erc20Batch];
     
-    // Add to pending wallets buffer
+    // 将钱包添加到待保存缓冲区
     this.pendingWallets.push(...newBatch);
     
-    // If buffer exceeds max size, trigger a database sync
+    // 如果缓冲区超过最大大小，则触发数据库同步
     if (this.pendingWallets.length >= this.maxBufferSize) {
       this.syncWithDatabase();
     }
     
-    // Increment counters for generated wallets
+    // 增加生成计数器
     this.generatedCount += newBatch.length;
     this.realGeneratedCount += newBatch.length;
     this.todayGenerated += newBatch.length;
     
-    // Update generation speed calculation
+    // 更新生成速度计算
     const now = Date.now();
     const elapsed = (now - this.lastSpeedUpdate) / 1000;
     
-    if (elapsed >= 0.25) { // Reduced from 0.5 to 0.25 seconds for more accurate speed reporting
+    if (elapsed >= 0.25) { // 减少为0.25秒以更准确地报告速度
       this.generationSpeed = Math.round((this.generatedCount - this.lastSample) / elapsed);
       this.lastSample = this.generatedCount;
       this.lastSpeedUpdate = now;
       
-      // Update progress if callback is set
+      // 如果设置了进度回调，则更新进度
       if (this.onProgress) {
         this.onProgress({
           count: this.realGeneratedCount,
@@ -520,18 +344,19 @@ export class WalletGeneratorEngine {
       }
     }
     
-    // Adaptive cycle timing based on storage efficiency
-    // Slow down if storage efficiency is poor
-    let cycleTime = 20 / this.config.threadCount; // Base cycle time reduced from 25ms to 20ms
+    // 根据存储效率调整生成周期时间
+    // 如果存储效率低，则显著减慢周期时间
+    let cycleTime = 20 / this.config.threadCount; // 基础周期时间减少为20ms
     if (storageEfficiency < 0.3) {
-      cycleTime = cycleTime * 3; // Slow down significantly if storage efficiency is very bad
+      cycleTime = cycleTime * 3; // 如果存储效率非常差，则显著减慢周期时间
     } else if (storageEfficiency < 0.7) {
-      cycleTime = cycleTime * 1.5; // Slow down moderately if storage efficiency is mediocre
+      cycleTime = cycleTime * 1.5; // 如果存储效率一般，则适度减慢周期时间
     }
     
-    // Schedule the next generation cycle
+    // 安排下一个生成周期
     setTimeout(() => this.runGenerationCycle(), cycleTime);
   }
 }
 
+// 单例实例
 export const walletGenerator = new WalletGeneratorEngine();
