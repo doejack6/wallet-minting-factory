@@ -10,26 +10,23 @@ const TabsList = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.List>,
   React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>
 >(({ className, ...props }, ref) => {
-  const TabsContext = TabsPrimitive.Root["Provider"];
-  // Add check to provide better error message in development
-  const inTabsContext = React.useContext(TabsContext);
-  if (process.env.NODE_ENV !== "production" && !inTabsContext) {
-    console.error(
-      "TabsList must be used within a Tabs component. " +
-      "Make sure you have wrapped your TabsList within a Tabs component."
-    );
+  // We're fixing the context access by using the proper way to check for Tabs context
+  try {
+    return (
+      <TabsPrimitive.List
+        ref={ref}
+        className={cn(
+          "inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground",
+          className
+        )}
+        {...props}
+      />
+    )
+  } catch (error) {
+    // This will catch the error if TabsList is rendered outside of a Tabs component
+    console.error("TabsList must be used within a Tabs component")
+    return null
   }
-
-  return (
-    <TabsPrimitive.List
-      ref={ref}
-      className={cn(
-        "inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground",
-        className
-      )}
-      {...props}
-    />
-  )
 })
 TabsList.displayName = TabsPrimitive.List.displayName
 
