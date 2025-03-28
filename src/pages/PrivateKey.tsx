@@ -25,23 +25,32 @@ const PrivateKey: React.FC = () => {
           const wallets = await walletDB.getWallets({ 
             type: 'ALL', 
             pattern: '',
-            patternType: 'ANY', // Add the missing property
-            patternLength: 0,    // Add the missing property
+            patternType: 'ANY',
+            patternLength: 0,
             dateFrom: null, 
             dateTo: null, 
             limit: 1000 
           });
           
+          // Fix: Match by ID exactly as it appears in the URL
           const foundWallet = wallets.find(w => w.id === id);
+          
           if (foundWallet) {
             setWallet(foundWallet);
           } else {
-            toast({
-              title: "未找到钱包",
-              description: "无法找到指定ID的钱包",
-              variant: "destructive",
-            });
-            navigate('/filter');
+            // Try to find by the first 8 characters of the address 
+            // which is how IDs are generated in the database
+            const walletByAddressPrefix = wallets.find(w => w.address.substring(0, 8) === id);
+            if (walletByAddressPrefix) {
+              setWallet(walletByAddressPrefix);
+            } else {
+              toast({
+                title: "未找到钱包",
+                description: "无法找到指定ID的钱包",
+                variant: "destructive",
+              });
+              navigate('/filter');
+            }
           }
         }
       } catch (error) {

@@ -1,3 +1,4 @@
+
 import { Wallet, WalletType, FilterOptions, DatabaseStats, CompactWallet } from './types';
 
 class WalletDatabase {
@@ -47,8 +48,10 @@ class WalletDatabase {
   }
   
   private expandWallet(compact: CompactWallet): Wallet {
+    // Make the ID more consistent - always use the first 8 chars of address
+    const id = compact.a.substring(0, 8);
     return {
-      id: compact.a.substring(0, 8), // Use first 8 chars of address as ID
+      id: id,
       address: compact.a,
       privateKey: compact.p,
       publicKey: compact.k,
