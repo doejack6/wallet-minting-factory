@@ -8,9 +8,13 @@
 export function generateRandomBytes(length: number): Uint8Array {
   const bytes = new Uint8Array(length);
   
+  // Check if we're in a browser environment with crypto support
   if (typeof window !== 'undefined' && window.crypto) {
     // 使用Web Crypto API以获得最佳性能和安全性
     window.crypto.getRandomValues(bytes);
+  } else if (typeof self !== 'undefined' && self.crypto) {
+    // Web Worker environment
+    self.crypto.getRandomValues(bytes);
   } else {
     // 没有加密API时的备选方案
     for (let i = 0; i < length; i++) {

@@ -24,10 +24,12 @@ const ServerConfigPanel: React.FC<ServerConfigPanelProps> = ({
 }) => {
   const { toast } = useToast();
   const [manualCores, setManualCores] = useState<number>(
-    Number(process.env.SERVER_CPU_CORES) || navigator.hardwareConcurrency || 16
+    typeof window !== 'undefined' && window.SERVER_CPU_CORES ? Number(window.SERVER_CPU_CORES) : (
+      typeof navigator !== 'undefined' && navigator.hardwareConcurrency ? navigator.hardwareConcurrency : 16
+    )
   );
   const [manualMemory, setManualMemory] = useState<number>(
-    Number(process.env.SERVER_MEMORY_MB) || Math.max(2048, config.memoryLimit)
+    typeof window !== 'undefined' && window.SERVER_MEMORY_MB ? Number(window.SERVER_MEMORY_MB) : Math.max(2048, config.memoryLimit)
   );
 
   // 组件挂载时检查环境变量
@@ -94,7 +96,7 @@ const ServerConfigPanel: React.FC<ServerConfigPanelProps> = ({
       <CardContent className="space-y-4">
         <Alert>
           <AlertDescription>
-            检测到浏览器报告的CPU核心数为: {navigator.hardwareConcurrency || "未知"}。
+            检测到浏览器报告的CPU核心数为: {typeof navigator !== 'undefined' && navigator.hardwareConcurrency ? navigator.hardwareConcurrency : "未知"}。
             如果您在服务器上运行，可以手动设置实际的服务器资源。
           </AlertDescription>
         </Alert>
