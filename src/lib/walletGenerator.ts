@@ -1,3 +1,4 @@
+
 import { WalletType, Wallet, GeneratorConfig } from './types';
 
 // Mock implementation of a high-performance wallet generator
@@ -65,11 +66,12 @@ export class WalletGeneratorEngine {
   private generationSpeed = 0;
   private targetSpeed = 100000; // Target 100k per second
   private generatedCount = 0;
+  private savedToDbCount = 0;
   private startTime: Date | null = null;
   private lastSpeedUpdate = 0;
   private lastSample = 0;
   private todayGenerated = 0;
-  private onProgress: ((stats: { count: number, speed: number }) => void) | null = null;
+  private onProgress: ((stats: { count: number, speed: number, savedCount: number }) => void) | null = null;
   
   // Advanced configuration options
   private config: GeneratorConfig = {
@@ -100,8 +102,20 @@ export class WalletGeneratorEngine {
     this.todayGenerated = 0;
   }
   
-  public setOnProgress(callback: (stats: { count: number, speed: number }) => void): void {
+  public setOnProgress(callback: (stats: { count: number, speed: number, savedCount: number }) => void): void {
     this.onProgress = callback;
+  }
+  
+  public setSavedCount(count: number): void {
+    this.savedToDbCount = count;
+  }
+  
+  public getSavedCount(): number {
+    return this.savedToDbCount;
+  }
+  
+  public incrementSavedCount(count: number): void {
+    this.savedToDbCount += count;
   }
   
   public setConfig(config: Partial<GeneratorConfig>): void {
@@ -194,7 +208,8 @@ export class WalletGeneratorEngine {
       if (this.onProgress) {
         this.onProgress({
           count: this.generatedCount,
-          speed: this.generationSpeed
+          speed: this.generationSpeed,
+          savedCount: this.savedToDbCount
         });
       }
     }

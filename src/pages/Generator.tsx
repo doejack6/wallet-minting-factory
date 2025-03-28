@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,7 @@ const Generator: React.FC = () => {
   const [autoSave, setAutoSave] = useState(true);
   const [saveFrequency, setSaveFrequency] = useState<number>(1000); // 保存频率，默认1000ms（1秒）
   const [generatedCount, setGeneratedCount] = useState(0);
+  const [savedCount, setSavedCount] = useState(0);
   const [recentWallets, setRecentWallets] = useState<Wallet[]>([]);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [activeTab, setActiveTab] = useState('trc20');
@@ -42,10 +44,15 @@ const Generator: React.FC = () => {
     setIsRunning(walletGenerator.isRunning());
     setConfig(walletGenerator.getConfig());
     
+    // Get initial database count
+    setSavedCount(walletDB.getTotalCount());
+    walletGenerator.setSavedCount(walletDB.getTotalCount());
+    
     // Set up progress callback
     walletGenerator.setOnProgress((stats) => {
       setCurrentSpeed(stats.speed);
       setGeneratedCount(stats.count);
+      setSavedCount(stats.savedCount);
     });
     
     // Update UI every second
@@ -61,15 +68,21 @@ const Generator: React.FC = () => {
     // Set up separate interval for database saving based on saveFrequency
     const dbSaveInterval = setInterval(() => {
       if (walletGenerator.isRunning() && autoSave) {
-        walletDB.storeWallets(walletGenerator.getLastBatch(1000))
-          .catch(error => {
-            console.error('Failed to save wallets to database', error);
-            toast({
-              title: "Database Error",
-              description: "Failed to save wallets to database.",
-              variant: "destructive",
+        const walletsToSave = walletGenerator.getLastBatch(100);
+        if (walletsToSave.length > 0) {
+          walletDB.storeWallets(walletsToSave)
+            .then(() => {
+              walletGenerator.incrementSavedCount(walletsToSave.length);
+            })
+            .catch(error => {
+              console.error('Failed to save wallets to database', error);
+              toast({
+                title: "Database Error",
+                description: "Failed to save wallets to database.",
+                variant: "destructive",
+              });
             });
-          });
+        }
       }
     }, saveFrequency);
     
@@ -148,7 +161,7 @@ const Generator: React.FC = () => {
     }
   };
 
-  // Update this function to correctly filter by wallet type
+  // Function to filter wallets by type
   const getFilteredWallets = (type: 'TRC20' | 'ERC20') => {
     return recentWallets.filter(wallet => wallet.type === type);
   };
@@ -252,7 +265,9 @@ const Generator: React.FC = () => {
               
               <div className="p-4 bg-secondary rounded-lg">
                 <div className="text-xs text-muted-foreground mb-1">已生成总数</div>
-                <div className="text-2xl font-bold">{formatNumber(generatedCount)}</div>
+                <div className="text-lg font-bold">{formatNumber(generatedCount)}</div>
+                <div className="text-xs text-muted-foreground mb-1 mt-1">已保存到数据库</div>
+                <div className="text-lg font-bold">{formatNumber(savedCount)}</div>
                 <div className="mt-2 text-xs text-muted-foreground">
                   运行时间: {formatTime(elapsedTime)}
                 </div>

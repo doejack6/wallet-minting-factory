@@ -1,5 +1,6 @@
 
 import { Wallet, WalletType, FilterOptions, DatabaseStats, SearchPatternType } from './types';
+import { walletGenerator } from './walletGenerator';
 
 // Mock implementation of a high-performance database
 // In a real application, this would use IndexedDB, SQLite, or other storage solution
@@ -50,6 +51,11 @@ class WalletDatabase {
       this.writeSpeed = Math.round((this.wallets.length - this.lastCount) / elapsed);
       this.lastCount = this.wallets.length;
       this.lastSpeedUpdate = now;
+    }
+    
+    // Update wallet generator with current database count
+    if (walletGenerator) {
+      walletGenerator.setSavedCount(this.wallets.length);
     }
     
     // Simulate database latency
@@ -190,6 +196,12 @@ class WalletDatabase {
   public async clearDatabase(): Promise<void> {
     this.wallets = [];
     this.lastWrite = new Date();
+    
+    // Reset wallet generator saved count when database is cleared
+    if (walletGenerator) {
+      walletGenerator.setSavedCount(0);
+    }
+    
     await new Promise(resolve => setTimeout(resolve, 100));
   }
 }
