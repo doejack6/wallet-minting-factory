@@ -18,7 +18,7 @@ import {
   TableHeader, 
   TableRow 
 } from '@/components/ui/table';
-import { Filter as FilterIcon, Copy, RefreshCw, Search, Key, Hash, FileDown, FileCsv, FileText } from 'lucide-react';
+import { Filter as FilterIcon, Copy, RefreshCw, Search, Key, Hash, FileDown, FileText } from 'lucide-react';
 import { FilterOptions, Wallet, WalletType, SearchPatternType } from '@/lib/types';
 import { walletDB } from '@/lib/database';
 import { useToast } from '@/components/ui/use-toast';
@@ -189,7 +189,7 @@ const Filter: React.FC = () => {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => handleExport('csv')}>
-                <FileCsv className="mr-2 h-4 w-4" />
+                <FileText className="mr-2 h-4 w-4" />
                 导出为CSV
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => handleExport('txt')}>

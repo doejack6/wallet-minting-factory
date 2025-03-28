@@ -14,7 +14,6 @@ import {
   BarChart4,
   Settings2,
   FileDown,
-  FileCsv,
   FileText
 } from 'lucide-react';
 import { walletDB } from '@/lib/database';
@@ -174,7 +173,7 @@ const Database: React.FC = () => {
                 onClick={() => handleExport('csv')}
                 disabled={isExporting || dbStats.totalStored === 0}
               >
-                <FileCsv className="mr-2 h-4 w-4" />
+                <FileText className="mr-2 h-4 w-4" />
                 导出为CSV
               </DropdownMenuItem>
               <DropdownMenuItem 

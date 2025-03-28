@@ -211,16 +211,6 @@ const Generator: React.FC = () => {
     return 500; // Low speed
   };
 
-  useEffect(() => {
-    // Auto-adjust save frequency when target speed changes
-    if (autoSave) {
-      const optimal = getOptimalSaveFrequency();
-      if (saveFrequency !== optimal) {
-        setSaveFrequency(optimal);
-      }
-    }
-  }, [targetSpeed, autoSave]);
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
