@@ -1,10 +1,11 @@
+
 # Welcome to your Lovable project
 
 ## Project info
 
 **URL**: https://lovable.dev/projects/42500577-b37a-482d-9d9c-730f309906e1
 
-## Docker 部署指南
+## Docker 完整部署指南
 
 ### 先决条件
 - 安装 Docker
@@ -23,30 +24,51 @@ cd <YOUR_PROJECT_NAME>
 docker-compose up -d --build
 ```
 
+### 数据持久化
+
+系统自动配置了数据持久化：
+- 钱包数据存储在 Docker 卷 `wallet-data` 中
+- 日志文件保存在 `./logs` 目录
+
+### 环境变量配置
+
+可以通过 `.env` 文件或在 `docker-compose` 命令中设置以下环境变量：
+```
+VITE_API_URL=/api  # API 服务器地址
+```
+
 ### Docker 命令
 
 - 启动容器: `docker-compose up -d`
 - 停止容器: `docker-compose down`
 - 查看运行中的容器: `docker-compose ps`
 - 查看容器日志: `docker-compose logs wallet-factory`
+- 进入容器: `docker-compose exec wallet-factory sh`
 
 ### 配置说明
 
 - 默认端口: 80
 - 服务名称: wallet-factory
+- 数据卷: wallet-data
 - 容器重启策略: always
 
 ### 性能优化
 
 - Nginx 配置已优化静态资源缓存
+- IndexedDB 数据自动持久化到 Docker 卷
 - 多阶段构建减小镜像体积
 - 使用轻量级 Alpine Linux 镜像
+
+### 扩展配置
+
+如需连接额外的后端 API 服务，请取消注释 nginx.conf 文件中的 API 代理配置部分，并确保在同一 Docker 网络中运行 API 服务。
 
 ### 故障排查
 
 如遇到问题，请检查:
 - Docker 版本是否兼容
 - 端口 80 是否被占用
+- 数据卷权限是否正确
 - 网络连接是否正常
 
 ## 其他部署方式

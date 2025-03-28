@@ -10,6 +10,10 @@ RUN npm ci
 # Copy rest of the application code
 COPY . .
 
+# Build the application with environment variables
+ARG VITE_API_URL
+ENV VITE_API_URL=${VITE_API_URL}
+
 # Build the application
 RUN npm run build
 
@@ -21,6 +25,9 @@ COPY --from=build /app/dist /usr/share/nginx/html
 
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Create a volume for persistent data
+VOLUME /data
 
 # Expose port
 EXPOSE 80
