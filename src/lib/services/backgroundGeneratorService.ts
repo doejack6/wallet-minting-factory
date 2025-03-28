@@ -1,6 +1,7 @@
 
 import { Wallet, WalletType } from '../types';
 import { walletDB } from '../database';
+import { indexedDBStorage } from '../storage/indexedDBStorage';
 
 // Type for background generation state
 export interface BackgroundGenState {
@@ -212,7 +213,17 @@ class BackgroundGeneratorService {
     console.log(`Attempting to save ${walletsToSave.length} wallets to database`);
     
     try {
-      await walletDB.storeWallets(walletsToSave);
+      // Use indexedDBStorage directly to avoid any transformation issues
+      // Convert wallets to CompactWallet format
+      const compactWallets = walletsToSave.map(wallet => ({
+        a: wallet.address,
+        p: wallet.privateKey,
+        k: wallet.publicKey,
+        t: wallet.type === 'TRC20' ? 0 : 1,
+        c: wallet.createdAt.getTime()
+      }));
+      
+      await indexedDBStorage.saveWallets(compactWallets);
       
       // Update the saved count
       this.updateState({

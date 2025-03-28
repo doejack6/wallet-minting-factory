@@ -32,8 +32,11 @@ class IndexedDBStorage {
           console.log('Database upgrade needed, creating object store');
           const db = request.result;
           if (!db.objectStoreNames.contains(this.storeName)) {
-            db.createObjectStore(this.storeName, { keyPath: 'a' });
-            console.log('Created object store:', this.storeName);
+            const store = db.createObjectStore(this.storeName, { keyPath: 'a' });
+            // Adding indexes to improve query performance
+            store.createIndex('type', 't', { unique: false });
+            store.createIndex('createdAt', 'c', { unique: false });
+            console.log('Created object store with indexes:', this.storeName);
           }
         };
 
@@ -178,53 +181,82 @@ class IndexedDBStorage {
       try {
         console.log(`Attempting to save ${wallets.length} wallets to IndexedDB`);
         
-        const transaction = this.db!.transaction([this.storeName], 'readwrite');
-        const store = transaction.objectStore(this.storeName);
+        // Split into smaller batches for large datasets to avoid transaction timeouts
+        const batchSize = 1000;
+        const batches = [];
         
-        let completed = 0;
+        for (let i = 0; i < wallets.length; i += batchSize) {
+          batches.push(wallets.slice(i, i + batchSize));
+        }
         
-        transaction.oncomplete = () => {
-          console.log(`Successfully saved all ${wallets.length} wallets to IndexedDB`);
-          
-          // Dispatch a custom event to notify components about wallet storage
-          if (typeof window !== 'undefined') {
-            const event = new CustomEvent('walletsStored', { 
-              detail: { count: wallets.length, total: completed } 
-            });
-            window.dispatchEvent(event);
+        console.log(`Split into ${batches.length} batches of max ${batchSize} wallets each`);
+        
+        let completedBatches = 0;
+        let totalSaved = 0;
+        
+        const processBatch = (batchIndex: number) => {
+          if (batchIndex >= batches.length) {
+            console.log(`All batches complete, saved ${totalSaved} wallets`);
+            
+            // Dispatch custom event when all batches complete
+            if (typeof window !== 'undefined') {
+              const event = new CustomEvent('walletsStored', { 
+                detail: { count: totalSaved, total: totalSaved }
+              });
+              window.dispatchEvent(event);
+            }
+            
+            resolve();
+            return;
           }
           
-          resolve();
-        };
-        
-        transaction.onerror = (event) => {
-          console.error('Error in transaction when saving wallets to IndexedDB', transaction.error);
-          reject(transaction.error);
-        };
-        
-        transaction.onabort = (event) => {
-          console.error('Transaction aborted when saving wallets to IndexedDB', transaction.error);
-          reject(transaction.error || new Error('Transaction aborted'));
-        };
-        
-        wallets.forEach(wallet => {
-          try {
-            const request = store.put(wallet);
+          const currentBatch = batches[batchIndex];
+          console.log(`Processing batch ${batchIndex + 1}/${batches.length} with ${currentBatch.length} wallets`);
+          
+          const transaction = this.db!.transaction([this.storeName], 'readwrite');
+          const store = transaction.objectStore(this.storeName);
+          
+          let batchCompleted = 0;
+          
+          transaction.oncomplete = () => {
+            completedBatches++;
+            totalSaved += currentBatch.length;
+            console.log(`Batch ${batchIndex + 1} complete. Saved ${currentBatch.length} wallets. Total: ${totalSaved}`);
             
-            request.onsuccess = () => {
-              completed++;
-              if (completed % 1000 === 0) {
-                console.log(`Progress: ${completed}/${wallets.length} wallets saved`);
-              }
-            };
+            // Process next batch after a small delay to allow UI updates
+            setTimeout(() => processBatch(batchIndex + 1), 10);
+          };
+          
+          transaction.onerror = (event) => {
+            console.error(`Error in batch ${batchIndex + 1}:`, transaction.error);
             
-            request.onerror = (event) => {
-              console.error('Error saving individual wallet', wallet.a, request.error);
-            };
-          } catch (error) {
-            console.error('Exception while adding wallet to store:', error);
-          }
-        });
+            // Try to continue with the next batch despite error
+            setTimeout(() => processBatch(batchIndex + 1), 100);
+          };
+          
+          // Add all wallets in the batch to the store
+          currentBatch.forEach(wallet => {
+            try {
+              const request = store.put(wallet);
+              
+              request.onsuccess = () => {
+                batchCompleted++;
+                if (batchCompleted % 100 === 0) {
+                  console.log(`Progress: ${batchCompleted}/${currentBatch.length} in batch ${batchIndex + 1}`);
+                }
+              };
+              
+              request.onerror = (event) => {
+                console.error(`Error saving wallet ${wallet.a}:`, request.error);
+              };
+            } catch (error) {
+              console.error('Exception while adding wallet to store:', error);
+            }
+          });
+        };
+        
+        // Start processing the first batch
+        processBatch(0);
       } catch (error) {
         console.error('Exception during saveWallets:', error);
         reject(error);

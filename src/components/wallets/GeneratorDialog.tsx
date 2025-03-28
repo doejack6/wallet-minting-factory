@@ -7,12 +7,12 @@ import { Label } from '@/components/ui/label';
 import { backgroundGenerator, BackgroundGenState } from '@/lib/services/backgroundGeneratorService';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { walletGenerator } from '@/lib/walletGenerator';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Slider } from '@/components/ui/slider';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Info } from 'lucide-react';
+import { indexedDBStorage } from '@/lib/storage/indexedDBStorage';
 
 interface GeneratorDialogProps {
   open: boolean;
@@ -26,9 +26,14 @@ const GeneratorDialog: React.FC<GeneratorDialogProps> = ({ open, onOpenChange })
   const [useTRC20, setUseTRC20] = useState<boolean>(true);
   const [useERC20, setUseERC20] = useState<boolean>(true);
   const [trc20Ratio, setTrc20Ratio] = useState<number>(50);
+  const [dbStatus, setDbStatus] = useState<{ready: boolean; pendingOps: number}>({
+    ready: false,
+    pendingOps: 0
+  });
   
   const isRunning = backgroundState.isRunning;
   const generatedCount = backgroundState.generatedCount;
+  const savedCount = backgroundState.savedCount;
   const progress = backgroundState.progress;
   const generationSpeed = backgroundState.speed;
   const error = backgroundState.error;
@@ -36,7 +41,35 @@ const GeneratorDialog: React.FC<GeneratorDialogProps> = ({ open, onOpenChange })
   useEffect(() => {
     // Subscribe to background generator state changes
     const unsubscribe = backgroundGenerator.subscribeTo(setBackgroundState);
-    return unsubscribe;
+    
+    // Check IndexedDB status
+    const checkDbStatus = () => {
+      const ready = indexedDBStorage.isDatabaseReady();
+      const { pending } = indexedDBStorage.getQueueStatus();
+      setDbStatus({
+        ready,
+        pendingOps: pending
+      });
+    };
+    
+    // Check database status initially and periodically
+    checkDbStatus();
+    const dbInterval = setInterval(checkDbStatus, 1000);
+    
+    // Add listener for database events
+    const handleDbEvent = () => {
+      checkDbStatus();
+    };
+    
+    window.addEventListener('databaseCleared', handleDbEvent);
+    window.addEventListener('walletsStored', handleDbEvent);
+    
+    return () => {
+      unsubscribe();
+      clearInterval(dbInterval);
+      window.removeEventListener('databaseCleared', handleDbEvent);
+      window.removeEventListener('walletsStored', handleDbEvent);
+    };
   }, []);
   
   const handleCountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -64,6 +97,15 @@ const GeneratorDialog: React.FC<GeneratorDialogProps> = ({ open, onOpenChange })
       toast({
         title: "请选择钱包类型",
         description: "至少需要选择一种钱包类型。",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!dbStatus.ready) {
+      toast({
+        title: "数据库未就绪",
+        description: "IndexedDB数据库未初始化完成，请稍候再试。",
         variant: "destructive",
       });
       return;
@@ -128,6 +170,20 @@ const GeneratorDialog: React.FC<GeneratorDialogProps> = ({ open, onOpenChange })
           <Alert variant="destructive" className="mt-2">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        
+        {!dbStatus.ready && (
+          <Alert variant="warning" className="mt-2 bg-yellow-50 text-yellow-800 border-yellow-200">
+            <Info className="h-4 w-4" />
+            <AlertDescription>数据库初始化中，请稍候...</AlertDescription>
+          </Alert>
+        )}
+        
+        {dbStatus.pendingOps > 0 && (
+          <Alert variant="info" className="mt-2 bg-blue-50 text-blue-800 border-blue-200">
+            <Info className="h-4 w-4" />
+            <AlertDescription>数据库正在处理 {dbStatus.pendingOps} 个待保存操作</AlertDescription>
           </Alert>
         )}
         
@@ -198,6 +254,19 @@ const GeneratorDialog: React.FC<GeneratorDialogProps> = ({ open, onOpenChange })
                 <span>生成速度: {formatNumber(generationSpeed)}/秒</span>
                 <span>剩余时间: {calculateTimeRemaining()}</span>
               </div>
+              
+              <div className="flex justify-between text-sm mt-4">
+                <span>已保存到数据库:</span>
+                <span className="font-medium">{formatNumber(savedCount)}</span>
+              </div>
+              <Progress 
+                value={savedCount > 0 && generatedCount > 0 ? (savedCount / generatedCount) * 100 : 0} 
+                className="h-2 bg-blue-100" 
+              />
+              <div className="text-xs text-muted-foreground text-right">
+                保存进度: {savedCount > 0 && generatedCount > 0 ? 
+                  Math.round((savedCount / generatedCount) * 100) : 0}%
+              </div>
             </div>
           )}
         </div>
@@ -206,7 +275,7 @@ const GeneratorDialog: React.FC<GeneratorDialogProps> = ({ open, onOpenChange })
           {isRunning ? (
             <Button variant="destructive" onClick={handleStop}>停止生成</Button>
           ) : (
-            <Button onClick={handleStart}>开始生成</Button>
+            <Button onClick={handleStart} disabled={!dbStatus.ready}>开始生成</Button>
           )}
         </DialogFooter>
       </DialogContent>
